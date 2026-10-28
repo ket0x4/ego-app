@@ -1,4 +1,4 @@
-/* Dracula Theme - EGO Bus Tracker (Simplified & High Readability) */
+/* Dracula Theme - EGO Bus Tracker (Simplified, High Readability & Fully Synced) */
 :root {
     /* Backgrounds - Deep & Soft */
     --bg-primary: #1e1f29;
@@ -9,8 +9,9 @@
     /* Text - High Contrast & Soft */
     --fg-primary: #f8f8f2;
     --fg-secondary: #a9b1d6;
+    --text-muted: #6272a4;
     
-    /* Soft Dracula Accents (No harsh neon) */
+    /* Soft Dracula Accents */
     --purple: #bd93f9;
     --pink: #ff79c6;
     --cyan: #8be9fd;
@@ -80,6 +81,7 @@ body {
     cursor: pointer;
     color: var(--fg-secondary);
     font-weight: 600;
+    transition: all 0.2s ease;
 }
 
 .tab-btn:hover {
@@ -157,6 +159,12 @@ body {
     border-radius: 6px;
     border-left: 4px solid var(--purple);
     cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.result-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
 }
 
 .result-card h4 {
@@ -169,7 +177,7 @@ body {
     font-size: 0.9rem;
 }
 
-/* Live Tracking & Forms */
+/* Live Tracking Container & Forms */
 .live-container {
     display: flex;
     flex-direction: column;
@@ -212,24 +220,51 @@ body {
     border-radius: 6px;
     font-weight: 700;
     cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.btn-primary:hover {
+    opacity: 0.9;
 }
 
 /* Badges & Indicators */
-.live-item {
-    background: var(--bg-secondary);
-    padding: 15px;
-    border-radius: 6px;
-    border-left: 4px solid var(--green);
-    margin-bottom: 10px;
+.badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
-.live-item.next-departure {
-    border-left-color: var(--orange);
+.badge-bus {
+    background: var(--green);
+    color: var(--bg-primary);
 }
 
-.live-item .vehicle-badge { background: var(--purple); color: var(--bg-primary); padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 700; }
-.live-item .plaka-badge { background: var(--cyan); color: var(--bg-primary); padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 700; }
-.live-item .line-badge { background: var(--orange); color: var(--bg-primary); padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 700; }
+.badge-plate {
+    background: var(--purple);
+    color: var(--bg-primary);
+}
+
+.traffic-normal {
+    background: var(--cyan);
+    color: var(--bg-primary);
+}
+
+.traffic-heavy {
+    background: var(--red);
+    color: var(--bg-primary);
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+.text-success {
+    color: var(--green);
+}
 
 .pulsing-dot {
     width: 8px;
@@ -248,23 +283,372 @@ body {
     margin-bottom: 15px;
 }
 
-.announcement-item h4 { color: var(--orange); }
-.announcement-item .date { color: var(--fg-secondary); font-size: 0.8rem; }
+.announcement-item h4 { 
+    color: var(--orange); 
+    margin-bottom: 5px;
+}
 
-/* Modal */
+.announcement-item .date { 
+    color: var(--fg-secondary); 
+    font-size: 0.8rem;
+    margin-bottom: 8px;
+}
+
+/* Modal Core Styles */
 .modal {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(30, 31, 41, 0.8);
     display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
 }
 
 .modal-content {
-    background: var(--card-bg);
+    background: var(--bg-secondary);
     padding: 30px;
     border-radius: 12px;
     width: 90%; max-width: 600px;
     border: 1px solid var(--border);
+    position: relative;
+}
+
+.close-modal {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--fg-secondary);
+}
+
+.close-modal:hover {
+    color: var(--fg-primary);
 }
 
 .hidden { display: none !important; }
+
+/* Empty, Error & Loading Status Messages */
+.empty-message {
+    text-align: center;
+    color: var(--fg-secondary);
+    padding: 40px;
+}
+
+.error-message {
+    text-align: center;
+    color: var(--red);
+    padding: 40px;
+}
+
+.loading-spinner {
+    text-align: center;
+    color: var(--cyan);
+    padding: 20px;
+    font-weight: 600;
+}
+
+/* Meta Text */
+.meta {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+}
+
+/* Modal Header */
+.modal-header {
+    background: var(--bg-tertiary);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid var(--purple);
+}
+
+.modal-header h3 {
+    color: var(--purple);
+    margin-bottom: 5px;
+}
+
+.modal-header p {
+    color: var(--fg-secondary);
+    margin: 0;
+}
+
+/* Modal Section Titles & Details */
+.modal-section-title, .section-title {
+    color: var(--cyan);
+    margin: 20px 0 15px 0;
+    font-size: 1.1rem;
+}
+
+/* Modal Scroll Container */
+.modal-scroll {
+    max-height: 350px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+/* Stop Cards & Detail Rows inside Modal */
+.stop-card, .stop-detail-row {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stop-card:hover {
+    border-color: var(--purple);
+    box-shadow: var(--shadow);
+}
+
+.stop-info {
+    flex: 1;
+}
+
+.stop-name {
+    color: var(--fg-primary);
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.stop-code {
+    color: var(--fg-secondary);
+    font-size: 0.85rem;
+}
+
+.detail-code {
+    background: var(--bg-secondary);
+    color: var(--cyan);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.stop-location {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 3px;
+}
+
+.stop-number {
+    background: var(--bg-secondary);
+    color: var(--green);
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.stop-duration-group {
+    margin-bottom: 15px;
+    background: var(--bg-secondary);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.duration-heading {
+    color: var(--orange);
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+}
+
+/* Modal Actions Area */
+.modal-actions, .action-container {
+    margin-top: 25px;
+    text-align: center;
+}
+
+.modal-actions .btn-primary, .action-container .btn-primary {
+    width: auto;
+    padding: 12px 40px;
+}
+
+/* Live Tracking Interface Classes */
+.live-summary-card {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    border-left: 4px solid var(--green);
+}
+
+.summary-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.live-summary-card h3 {
+    color: var(--green);
+    margin: 0 0 4px 0;
+    font-size: 18px;
+}
+
+.live-summary-card p {
+    color: var(--fg-secondary);
+    margin: 0;
+    font-size: 13px;
+}
+
+.refresh-badge {
+    background: var(--bg-tertiary);
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 12px;
+    color: var(--fg-secondary);
+}
+
+/* Live Card Grouping by Time */
+.time-group {
+    margin-bottom: 16px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+/* Urgent Style Integration */
+.time-group.urgent {
+    border-color: var(--pink);
+}
+
+.time-group.urgent .time-header {
+    background: linear-gradient(135deg, #282a36 0%, #ff5555 200%);
+}
+
+.time-group.urgent .urgency-text {
+    color: var(--pink) !important;
+    font-weight: bold;
+}
+
+/* Live Time Group Header Layout */
+.time-header {
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
+}
+
+.time-header .icon {
+    font-size: 24px;
+}
+
+.time-header .time-info {
+    flex: 1;
+}
+
+.time-header .time-text {
+    color: var(--fg-primary);
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.time-header .urgency-text {
+    color: var(--fg-secondary);
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.time-header .count-badge {
+    background: var(--purple);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 13px;
+    color: var(--bg-primary);
+    font-weight: 700;
+}
+
+/* Vehicles List Container inside Time Group */
+.vehicles-list {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Individual Live Vehicle Card Structure */
+.vehicle-item {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+    border: 1px solid transparent;
+}
+
+.vehicle-item:hover {
+    background: #3e4153;
+    border-color: var(--border);
+}
+
+.vehicle-main {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
+.badges-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.info-line {
+    font-size: 13px;
+    color: var(--fg-secondary);
+}
+
+.vehicle-meta {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    justify-content: center;
+}
+
+.detail-text {
+    font-size: 12px;
+    color: var(--fg-secondary);
+}
+
+.delay-text {
+    font-size: 11px;
+    color: var(--orange);
+    font-weight: 600;
+}
+
+/* Fallback / No Data UI Cards */
+.no-data-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    max-width: 400px;
+    margin: 20px auto;
+}
+
+.no-data-card .icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.no-data-card h3 {
+    color: var(--fg-primary);
+    margin-bottom: 8px;
+}
+
+.no-data-card p {
+    color: var(--fg-secondary);
+    font-size: 14px;
+}

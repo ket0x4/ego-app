@@ -91,7 +91,7 @@ function initEventListeners() {
 
     // Live tracking
     elements.trackBtn.addEventListener('click', startLiveTracking);
-    elements.refreshLive.addEventListener('click', stopLiveTracking);
+    elements.refreshLive.addEventListener('click', refreshLive); // DÜZELTME: stopLiveTracking yerine refreshLive tetikleniyor
 
     // Geo search
     elements.geoSearchBtn.addEventListener('click', () => searchGeo(elements.geoSearch.value));
@@ -107,13 +107,12 @@ function initEventListeners() {
 async function apiRequest(endpoint, params = {}) {
     console.log('API Request:', { endpoint, params });
     
-    // Build query string from params
+    // URLSearchParams parametreleri otomatik encode eder.
     const queryParams = new URLSearchParams(params).toString();
-    // URL encode the endpoint to handle special characters
-    const encodedEndpoint = encodeURIComponent(endpoint);
     
     try {
-        const response = await fetch(`${API_BASE}/proxy?path=${encodedEndpoint}&${queryParams}`, {
+        // DÜZELTME: Çift encode hatası düzeltildi, path doğrudan parametre olarak gönderiliyor
+        const response = await fetch(`${API_BASE}/proxy?path=${endpoint}&${queryParams}`, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json'
@@ -129,21 +128,13 @@ async function apiRequest(endpoint, params = {}) {
 
 // API Endpoints
 const API_ENDPOINTS = {
-    // Hat listesi (action.asp with FNC=Hatlar)
     hatlar: '/hibrit/action.asp',
-    // Hat detayları (act.asp with FNC=HatBilgileri)
     hatBilgileri: '/hibrit/action.asp',
-    // Duraklar (action.asp with FNC=Duraklar)
     duraklar: '/hibrit/action.asp',
-    // Duraktan geçen hatlar (action.asp with FNC=DuraktanGecenHatlar)
     duraktanGecenHatlar: '/hibrit/action.asp',
-    // Duraktan geçiş saatleri (action.asp with FNC=DuraktanGecisSaatleri)
     duraktanGecisSaatleri: '/hibrit/action.asp',
-    // Duyurular (action.asp with FNC=Duyurular)
     duyurular: '/hibrit/action.asp',
-    // Yakın duraklar (action.asp with FNC=YakinDuraklar)
     yakinDuraklar: '/hibrit/action.asp',
-    // Canlı takip (srv.asp with FNC=Otobusler)
     canlıTakip: '/hibrit/srv.asp'
 };
 
@@ -156,15 +147,11 @@ async function loadLines(query = '') {
         showLoading(elements.linesLoading);
         elements.linesResults.innerHTML = '';
 
-        const params = {};
-        const data = await apiRequest(API_ENDPOINTS.hatlar, { FNC: 'Hatlar', ...params, LAN: 'tr' });
+        const data = await apiRequest(API_ENDPOINTS.hatlar, { FNC: 'Hatlar', LAN: 'tr' });
 
-        // Cache all lines globally for local filtering
         allLines = data.table || [];
-        
         let lines = [...allLines];
         
-        // Filter results if query provided (client-side filtering)
         if (query && query.trim()) {
             const q = query.toLowerCase().trim();
             lines = lines.filter(line => {
@@ -178,10 +165,10 @@ async function loadLines(query = '') {
             state.lines = lines;
             renderLines(lines);
         } else {
-            elements.linesResults.innerHTML = '<p style="text-align:center; color:var(--danger);">Hatlar yüklenemedi</p>';
+            elements.linesResults.innerHTML = '<p class="empty-message">Hatlar yüklenemedi</p>';
         }
     } catch (error) {
-        elements.linesResults.innerHTML = `<p style="text-align:center; color:var(--danger);">Hata: ${error.message}</p>`;
+        elements.linesResults.innerHTML = `<p class="error-message">Hata: ${error.message}</p>`;
     } finally {
         hideLoading(elements.linesLoading);
     }
@@ -198,12 +185,12 @@ async function searchLines(query) {
 // Render Lines
 function renderLines(lines) {
     if (lines.length === 0) {
-        elements.linesResults.innerHTML = '<p style="text-align:center; padding:40px;">Sonuç bulunamadı</p>';
+        elements.linesResults.innerHTML = '<p class="empty-message">Sonuç bulunamadı</p>';
         return;
     }
 
     elements.linesResults.innerHTML = lines.map(line => `
-        <div class="result-card" onclick="showStopModal('${line.kod}'); switchToStopsTab();">
+        <div class="result-card" onclick="showLineDetails('${line.kod}'); switchToStopsTab();">
             <h4>${line.ad}</h4>
             <p><strong>Kod:</strong> ${line.kod}</p>
             <p><strong>Süre:</strong> ${line.sure} dk</p>
@@ -229,10 +216,10 @@ async function loadStops(query = '') {
             state.stops = data.table;
             renderStops(state.stops);
         } else {
-            elements.stopsResults.innerHTML = '<p style="text-align:center; color:var(--danger);">Duraklar yüklenemedi</p>';
+            elements.stopsResults.innerHTML = '<p class="empty-message">Duraklar yüklenemedi</p>';
         }
     } catch (error) {
-        elements.stopsResults.innerHTML = `<p style="text-align:center; color:var(--danger);">Hata: ${error.message}</p>`;
+        elements.stopsResults.innerHTML = `<p class="error-message">Hata: ${error.message}</p>`;
     } finally {
         hideLoading(elements.stopsLoading);
     }
@@ -240,7 +227,8 @@ async function loadStops(query = '') {
 
 async function searchStops(query) {
     if (!query.trim()) {
-        await loadLines();
+        // DÜZELTME: Durak araması boşken hatları yükleme hatası giderildi
+        await loadStops();
         return;
     }
     await loadStops(query);
@@ -249,7 +237,7 @@ async function searchStops(query) {
 // Render Stops
 function renderStops(stops) {
     if (stops.length === 0) {
-        elements.stopsResults.innerHTML = '<p style="text-align:center; padding:40px;">Sonuç bulunamadı</p>';
+        elements.stopsResults.innerHTML = '<p class="empty-message">Sonuç bulunamadı</p>';
         return;
     }
 
@@ -258,7 +246,7 @@ function renderStops(stops) {
             <h4>${stop.ad}</h4>
             <p><strong>Kod:</strong> ${stop.kod}</p>
             <p><strong>Konum:</strong> ${stop.konum}</p>
-            <div class="meta">Enlem: ${stop.lat}, Boylam: ${stop.lng}</div>
+            <div class="meta">Lat: ${stop.lat}, Lng: ${stop.lng}</div>
         </div>
     `).join('');
 }
@@ -268,7 +256,62 @@ function showStopModal(stopCode) {
     loadStopDetails(stopCode);
 }
 
-// New function to switch to stops tab and load stop details
+// Show Line Details Modal
+async function showLineDetails(lineCode) {
+    try {
+        const data = await apiRequest(API_ENDPOINTS.hatBilgileri, {
+            FNC: 'HatBilgileri',
+            KOD: lineCode,
+            YOL: 'TRUE',
+            LAN: 'tr'
+        });
+
+        if (data.table && data.table.length > 0) {
+            const stops = data.table;
+            const lineName = allLines.find(l => l.kod === lineCode)?.ad || lineCode;
+            
+            // DÜZELTME: İngilizce ifadeler Türkçe'ye çevrildi
+            elements.modalTitle.textContent = `Hat: ${lineCode} - ${lineName}`;
+            elements.modalBody.innerHTML = `
+                <div class="modal-header">
+                    <h3>🛤️ Hat Bilgileri</h3>
+                    <p>Toplam ${stops.length} durak</p>
+                </div>
+                
+                <h3 class="modal-section-title">📍 Bu Hattın Durakları:</h3>
+                <div class="modal-scroll">
+                    ${stops.map((stop, index) => `
+                        <div class="stop-card">
+                            <div class="stop-info">
+                                <div class="stop-name">${stop.ad}</div>
+                                <div class="stop-code">Durak Kodu: ${stop.kod}</div>
+                                ${stop.konum ? `<div class="stop-location">${stop.konum}</div>` : ''}
+                            </div>
+                            <div class="stop-number">${index + 1}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="modal-actions">
+                    <button class="btn-primary" onclick="openLiveTracking('${lineCode}'); switchToLiveTab('${lineCode}'); closeModal();">
+                        Bus Canlı Takip
+                    </button>
+                </div>
+            `;
+            
+            elements.modal.classList.remove('hidden');
+        } else {
+            elements.modalTitle.textContent = 'Hat Bulunamadı';
+            elements.modalBody.innerHTML = '<p class="empty-message">Bu koda ait hat bulunamadı.</p>';
+            elements.modal.classList.remove('hidden');
+        }
+    } catch (error) {
+        elements.modalTitle.textContent = 'Hata';
+        elements.modalBody.innerHTML = `<p class="error-message">Hata: ${error.message}</p>`;
+        elements.modal.classList.remove('hidden');
+    }
+}
+
 function switchToStopsTab() {
     const stopTab = document.querySelector('[data-tab="stops"]');
     if (stopTab) {
@@ -276,7 +319,6 @@ function switchToStopsTab() {
     }
 }
 
-// New function to switch to live tab
 function switchToLiveTab(stopCode) {
     const liveTab = document.querySelector('[data-tab="live"]');
     if (liveTab) {
@@ -284,15 +326,13 @@ function switchToLiveTab(stopCode) {
     }
 }
 
-// New function to open live tracking directly
 function openLiveTracking(stopCode) {
     elements.stopCode.value = stopCode;
-    state.stopCode = stopCode;
+    state.stopCode = stopCode; // DÜZELTME: Canlı takip durum bilgisi senkronize tutuluyor
     elements.lineCode.value = '';
     startLiveTracking();
 }
 
-// Open Live Tab (for modal button)
 function openLiveTab(stopCode) {
     openLiveTracking(stopCode);
 }
@@ -308,7 +348,6 @@ async function loadStopDetails(stopCode) {
         if (data.table && data.table.length > 0) {
             const lines = data.table;
             
-            // Group lines by duration
             const byDuration = {};
             lines.forEach(line => {
                 const duration = line.sure || 'Bilinmiyor';
@@ -325,22 +364,22 @@ async function loadStopDetails(stopCode) {
             elements.modalTitle.textContent = `Durak: ${stopCode}`;
             elements.modalBody.innerHTML = `
                 <div class="stop-details">
-                    <h3 style="margin-bottom:15px;">🚦 Bu duraktan geçen hatlar:</h3>
+                    <h3 class="section-title">🚦 Bu duraktan geçen hatlar:</h3>
                     ${sortedDurations.map(duration => `
                         <div class="stop-duration-group">
-                            <h4 style="margin:15px 0 10px; color:var(--primary);">⏱️ ${duration} dakikada</h4>
+                            <h4 class="duration-heading">⏱️ ${duration} dakikada</h4>
                             ${byDuration[duration].map(line => `
                                 <div class="stop-detail-row">
                                     <strong>${line.ad}</strong>
-                                    <span style="margin-left:10px; font-weight:400; color:var(--text-light);">${line.kod}</span>
+                                    <span class="detail-code">${line.kod}</span>
                                 </div>
                             `).join('')}
                         </div>
                     `).join('')}
                     
-                    <h3 style="margin:20px 0 15px;">🚌 Canlı Takip</h3>
-                    <div style="text-align:center;">
-                        <button class="btn-primary" onclick="openLiveTab('${stopCode}')">
+                    <h3 class="section-title">🚌 Canlı Takip</h3>
+                    <div class="action-container">
+                        <button class="btn-primary" onclick="openLiveTab('${stopCode}'); closeModal();">
                             Yaklaşan Otobüsleri Görüntüle
                         </button>
                     </div>
@@ -350,12 +389,12 @@ async function loadStopDetails(stopCode) {
             elements.modal.classList.remove('hidden');
         } else {
             elements.modalTitle.textContent = 'Durak Bulunamadı';
-            elements.modalBody.innerHTML = '<p>Bu kodlu bir durak bulunamadı.</p>';
+            elements.modalBody.innerHTML = '<p class="empty-message">Bu kodlu bir durak bulunamadı.</p>';
             elements.modal.classList.remove('hidden');
         }
     } catch (error) {
         elements.modalTitle.textContent = 'Hata';
-        elements.modalBody.innerHTML = `<p>Hata: ${error.message}</p>`;
+        elements.modalBody.innerHTML = `<p class="error-message">Hata: ${error.message}</p>`;
         elements.modal.classList.remove('hidden');
     }
 }
@@ -366,7 +405,6 @@ function closeModal() {
 
 // Live Tracking
 async function startLiveTracking() {
-    // Get stop code from state or input element
     const stopCode = state.stopCode || elements.stopCode.value.trim();
     const lineCode = elements.lineCode.value.trim();
 
@@ -392,16 +430,15 @@ async function startLiveTracking() {
             renderLiveList(data.table);
             elements.liveResults.classList.remove('hidden');
             
-            // Auto refresh every 30 seconds
             if (state.liveInterval) clearInterval(state.liveInterval);
             state.liveInterval = setInterval(refreshLive, 30000);
         } else {
             elements.liveResults.classList.remove('hidden');
             elements.liveList.innerHTML = `
-                <div style="text-align:center; padding:60px 20px;">
-                    <div style="font-size:48px; margin-bottom:15px;">🚌</div>
-                    <h3 style="color:var(--text); margin-bottom:10px;">Aktif Otobüs Yok</h3>
-                    <p style="color:var(--text-light);">Bu durakta şu anda aktif otobüs bulunmuyor.</p>
+                <div class="no-data-card">
+                    <div class="icon">🚌</div>
+                    <h3>Aktif Otobüs Yok</h3>
+                    <p>Bu durakta şu anda aktif otobüs bulunmuyor.</p>
                 </div>
             `;
         }
@@ -413,7 +450,6 @@ async function startLiveTracking() {
 }
 
 async function refreshLive() {
-    // Get stop code from state or input element
     const stopCode = state.stopCode || elements.stopCode.value.trim();
     const lineCode = elements.lineCode.value.trim();
 
@@ -432,10 +468,10 @@ async function refreshLive() {
             renderLiveList(data.table);
         } else {
             elements.liveList.innerHTML = `
-                <div style="text-align:center; padding:60px 20px;">
-                    <div style="font-size:48px; margin-bottom:15px;">🚌</div>
-                    <h3 style="color:var(--text); margin-bottom:10px;">Canlı Veri Yok</h3>
-                    <p style="color:var(--text-light);">Bu durakta şu anda otobüs yok veya canlı takip verisi alınamıyor.</p>
+                <div class="no-data-card">
+                    <div class="icon">🚌</div>
+                    <h3>Canlı Veri Yok</h3>
+                    <p>Bu durakta şu anda otobüs yok veya canlı takip verisi alınamıyor.</p>
                 </div>
             `;
         }
@@ -458,37 +494,33 @@ function stopLiveTracking() {
 function renderLiveList(items) {
     if (!items || items.length === 0) {
         elements.liveList.innerHTML = `
-            <div style="text-align:center; padding:60px 20px;">
-                <div style="font-size:48px; margin-bottom:15px;">🚌</div>
-                <h3 style="color:var(--text); margin-bottom:10px;">Canlı Veri Yok</h3>
-                <p style="color:var(--text-light);">Bu durakta şu anda otobüs yok veya canlı takip verisi alınamıyor.</p>
+            <div class="no-data-card">
+                <div class="icon">🚌</div>
+                <h3>Canlı Veri Yok</h3>
+                <p>Bu durakta şu anda otobüs yok veya canlı takip verisi alınamıyor.</p>
             </div>
         `;
         return;
     }
 
-    // Filter out placeholder items and unavailable buses
     const vehicles = items.filter(item => {
-        // Filter out placeholders
         if (!item.arac_no || item.arac_no === '-') return false;
-        // Filter out unavailable buses (check for status indicators)
         if (item.availabilite === 0 || item.availabilite === '0' || item.availabilite === false || item.availabilite === 'false') return false;
-        if (item.status === 'durduruldu' || item.status === 'durduruldu' || item.status === 'duraklatildi') return false;
+        if (item.status === 'durduruldu' || item.status === 'duraklatildi') return false;
         return true;
     });
 
     if (vehicles.length === 0) {
         elements.liveList.innerHTML = `
-            <div style="text-align:center; padding:60px 20px;">
-                <div style="font-size:48px; margin-bottom:15px;">🚌</div>
-                <h3 style="color:var(--text); margin-bottom:10px;">Aktif Otobüs Yok</h3>
-                <p style="color:var(--text-light);">Bu durakta şu anda aktif otobüs bulunmuyor.</p>
+            <div class="no-data-card">
+                <div class="icon">🚌</div>
+                <h3>Aktif Otobüs Yok</h3>
+                <p>Bu durakta şu anda aktif otobüs bulunmuyor.</p>
             </div>
         `;
         return;
     }
 
-    // Group by arrival time
     const byTime = {};
     vehicles.forEach(vehicle => {
         const time = vehicle.sure || vehicle.san || 'Bilinmiyor';
@@ -496,21 +528,21 @@ function renderLiveList(items) {
         byTime[time].push(vehicle);
     });
 
-    // Sort by time (simple sort)
     const sortedTimes = Object.keys(byTime).sort((a, b) => {
         const numA = parseInt(a.replace(/[^0-9]/g, '')) || 999;
         const numB = parseInt(b.replace(/[^0-9]/g, '')) || 999;
         return numA - numB;
     });
 
+    // DÜZELTME: Tüm inline CSS'ler kaldırıldı, sınıflar üzerinden atama yapıldı ve kırık div yapısı düzeltildi.
     let html = `
-        <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:16px; padding:24px; margin-bottom:20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="live-summary-card">
+            <div class="summary-wrapper">
                 <div>
-                    <h3 style="color:white; margin:0 0 5px 0; font-size:20px;">🚌 Yaklaşan Otobüsler</h3>
-                    <p style="color:rgba(255,255,255,0.8); margin:0; font-size:14px;">Toplam ${vehicles.length} otobüs yaklaşıyor</p>
+                    <h3>🚌 Yaklaşan Otobüsler</h3>
+                    <p>Toplam ${vehicles.length} otobüs yaklaşıyor</p>
                 </div>
-                <div style="background:rgba(255,255,255,0.2); padding:8px 16px; border-radius:20px; font-size:13px; color:white;">
+                <div class="refresh-badge">
                     🔄 Otomatik yenileme: 30s
                 </div>
             </div>
@@ -520,78 +552,51 @@ function renderLiveList(items) {
     sortedTimes.forEach(time => {
         const vehiclesAtTime = byTime[time];
         const isUrgent = parseInt(time) <= 5;
-        const groupStyle = isUrgent 
-            ? 'background:linear-gradient(135deg, #f093fb 0%, #f5576c 100%);'
-            : 'background:linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);';
-        
+        const groupClass = isUrgent ? 'time-group urgent' : 'time-group';
         const urgencyText = isUrgent ? '🔥 EN YAKIN' : '⏱️ Yaklaşan';
-        const urgencyColor = isUrgent ? '#ff6b6b' : '#4facfe';
 
         html += `
-            <div style="
-                margin-bottom:16px;
-                border-radius:12px;
-                overflow:hidden;
-                box-shadow:0 4px 12px rgba(0,0,0,0.1);
-                transition:transform 0.2s, box-shadow 0.2s;
-            " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(0,0,0,0.15)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'">
-                <div style="${groupStyle} padding:16px;">
-                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-                        <div style="font-size:24px;">⏱️</div>
-                        <div style="flex:1;">
-                            <div style="color:white; font-weight:700; font-size:18px; margin:0;">${time} dakika içinde</div>
-                            <div style="color:rgba(255,255,255,0.9); font-size:12px; margin:3px 0 0 0;">${urgencyText} • ${vehiclesAtTime.length} otobüs</div>
-                        </div>
-                        <div style="background:rgba(255,255,255,0.2); padding:6px 12px; border-radius:16px; font-size:13px; color:white;">
-                            ${vehiclesAtTime.length}
-                        </div>
+            <div class="${groupClass}">
+                <div class="time-header">
+                    <div class="icon">⏱️</div>
+                    <div class="time-info">
+                        <div class="time-text">${time} dakika içinde</div>
+                        <div class="urgency-text">${urgencyText} • ${vehiclesAtTime.length} otobüs</div>
                     </div>
-                    <div style="background:rgba(255,255,255,0.1); border-radius:8px; padding:12px;">
-                        ${vehiclesAtTime.map(vehicle => {
-                            // Get bus number from multiple possible field names
-                            const busNo = vehicle.arac_no || vehicle.arac || '-';
-                            const plakaNo = vehicle.plaka_no || vehicle.plaka || '';
-                            const busCode = vehicle.hat_kod || vehicle.hat || vehicle.kod || vehicle.line || '-';
-                            
-                            let badges = '';
-                            if (busNo !== '-') {
-                                badges += `<span style="background:var(--green); color:white; padding:4px 10px; border-radius:12px; font-size:13px; font-weight:600; margin-right:6px;">🚌 ${busNo}</span>`;
-                            }
-                            if (plakaNo) {
-                                badges += `<span style="background:var(--primary); color:white; padding:4px 10px; border-radius:12px; font-size:13px; font-weight:600; margin-right:6px;">🚗 ${plakaNo}</span>`;
-                            }
-                            if (vehicle.trafik?.trafficLevel) {
-                                const trafficClass = vehicle.trafik.trafficLevel === 'yogun' ? 'yogun' : 'normal';
-                                const trafficColor = vehicle.trafik.trafficLevel === 'yogun' ? '#e74c3c' : '#3498db';
-                                badges += `<span style="background:${trafficColor}; color:white; padding:4px 10px; border-radius:12px; font-size:13px; font-weight:600; margin-right:6px;">🚦 ${vehicle.trafik.label}</span>`;
-                            }
+                    <div class="count-badge">${vehiclesAtTime.length}</div>
+                </div>
+                <div class="vehicles-list">
+                    ${vehiclesAtTime.map(vehicle => {
+                        const busNo = vehicle.arac_no || vehicle.arac || '-';
+                        const plakaNo = vehicle.plaka_no || vehicle.plaka || '';
+                        const busCode = vehicle.hat_kod || vehicle.hat || vehicle.kod || vehicle.line || '-';
+                        
+                        let badges = '';
+                        if (busNo !== '-') {
+                            badges += `<span class="badge badge-bus">🚌 ${busCode}</span>`;
+                        }
+                        if (plakaNo) {
+                            badges += `<span class="badge badge-plate">🚗 ${plakaNo}</span>`;
+                        }
+                        if (vehicle.trafik?.trafficLevel) {
+                            const trafficClass = vehicle.trafik.trafficLevel === 'yogun' ? 'traffic-heavy' : 'traffic-normal';
+                            badges += `<span class="badge ${trafficClass}">🚦 ${vehicle.trafik.label}</span>`;
+                        }
 
-                            return `
-                                <div style="
-                                    display:flex; 
-                                    align-items:center; 
-                                    gap:10px; 
-                                    padding:8px;
-                                    background:rgba(255,255,255,0.95);
-                                    border-radius:8px;
-                                    margin-bottom:6px;
-                                    transition:background 0.2s;
-                                " onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
-                                    <div style="flex:1;">
-                                        <div style="font-weight:600; color:var(--text); margin-bottom:2px;">${badges || '<span style="color:var(--text-light)">🚌 Otobüs</span>'}</div>
-                                        ${busCode !== '-' ? `<div style="font-size:12px; color:var(--text-light); margin:2px 0;">🛤️ Hat: ${busCode}</div>` : ''}
-                                        ${vehicle.hiz ? `<div style="font-size:12px; color:var(--success); margin:2px 0;">⚡ Hız: ${vehicle.hiz} km/s</div>` : ''}
-                                    </div>
-                                    ${vehicle.detay ? `<div style="font-size:12px; color:var(--text-light); flex-shrink:0; text-align:right;">${vehicle.detay}</div>` : ''}
-                                    ${vehicle.trafik ? `
-                                        <div style="font-size:11px; color:var(--danger); margin-left:auto; flex-shrink:0;">
-                                            ${vehicle.trafik.avgDelayText ? `🕐 ${vehicle.trafik.avgDelayText} dk gecikme` : ''}
-                                        </div>
-                                    ` : ''}
+                        return `
+                            <div class="vehicle-item">
+                                <div class="vehicle-main">
+                                    <div class="badges-row">${badges || '<span class="text-muted">🚌 Otobüs</span>'}</div>
+                                    ${busCode !== '-' ? `<div class="info-line">🛤️ Otobüs: ${busNo}</div>` : ''}
+                                    ${vehicle.hiz ? `<div class="info-line text-success">⚡ Hız: ${vehicle.hiz} km/s</div>` : ''}
                                 </div>
-                            `;
-                        }).join('')}
-                    </div>
+                                <div class="vehicle-meta">
+                                    ${vehicle.detay ? `<div class="detail-text">${vehicle.detay}</div>` : ''}
+                                    ${vehicle.trafik?.avgDelayText ? `<div class="delay-text">🕐 ${vehicle.trafik.avgDelayText} dk gecikme</div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         `;
@@ -617,10 +622,10 @@ async function searchGeo(query) {
         if (data.type === 'FeatureCollection' && data.features && data.features.length > 0) {
             renderGeoResults(data.features);
         } else {
-            elements.geoResults.innerHTML = '<p style="text-align:center; padding:40px;">Sonuç bulunamadı</p>';
+            elements.geoResults.innerHTML = '<p class="empty-message">Sonuç bulunamadı</p>';
         }
     } catch (error) {
-        elements.geoResults.innerHTML = `<p style="text-align:center; color:var(--danger);">Hata: ${error.message}</p>`;
+        elements.geoResults.innerHTML = `<p class="error-message">Hata: ${error.message}</p>`;
     } finally {
         hideLoading(elements.geoLoading);
     }
@@ -656,16 +661,16 @@ async function loadAnnouncements() {
             state.announcements = data.table;
             renderAnnouncements(state.announcements);
         } else {
-            elements.announcementsList.innerHTML = '<p style="text-align:center; padding:40px;">Duyuru bulunamadı</p>';
+            elements.announcementsList.innerHTML = '<p class="empty-message">Duyuru bulunamadı</p>';
         }
     } catch (error) {
-        elements.announcementsList.innerHTML = `<p style="text-align:center; color:var(--danger);">Hata: ${error.message}</p>`;
+        elements.announcementsList.innerHTML = `<p class="error-message">Hata: ${error.message}</p>`;
     }
 }
 
 function renderAnnouncements(announcements) {
     if (announcements.length === 0) {
-        elements.announcementsList.innerHTML = '<p style="text-align:center; padding:40px;">Duyuru bulunamadı</p>';
+        elements.announcementsList.innerHTML = '<p class="empty-message">Duyuru bulunamadı</p>';
         return;
     }
 

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EGO Otobüs Takip</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🚌 EGO Otobüs Takip</h1>
+                <p class="subtitle">Ankara Büyükşehir Belediyesi EGO Genel Müdürlüğü</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Tab Navigation -->
+            <nav class="tabs">
+                <button class="tab-btn active" data-tab="lines">Hatlar</button>
+                <button class="tab-btn" data-tab="stops">Duraklar</button>
+                <button class="tab-btn" data-tab="live">Canlı Takip</button>
+                <button class="tab-btn" data-tab="search">Ara</button>
+                <button class="tab-btn" data-tab="announcements">Duyurular</button>
+            </nav>
+
+            <!-- Lines Tab -->
+            <section id="lines" class="tab-content active">
+                <div class="search-section">
+                    <input type="text" id="lineSearch" class="search-input" placeholder="🔍 Hat aramaya başla...">
+                    <button id="searchLinesBtn" class="search-btn">Ara</button>
+                </div>
+                <div class="results-container">
+                    <div id="linesResults" class="results-grid"></div>
+                    <div id="linesLoading" class="loading hidden">Yükleniyor</div>
+                </div>
+            </section>
+
+            <!-- Stops Tab -->
+            <section id="stops" class="tab-content">
+                <div class="search-section">
+                    <input type="text" id="stopSearch" class="search-input" placeholder="🔍 Durak kodu veya adını ara...">
+                    <button id="searchStopsBtn" class="search-btn">Ara</button>
+                </div>
+                <div class="results-container">
+                    <div id="stopsResults" class="results-grid"></div>
+                    <div id="stopsLoading" class="loading hidden">Yükleniyor</div>
+                </div>
+            </section>
+
+            <!-- Live Tab -->
+            <section id="live" class="tab-content">
+                <div class="live-container">
+                    <div class="live-setup">
+                        <h2>📡 Canlı Otobüs Takibi</h2>
+                        <div class="form-group">
+                            <label for="stopCode">📍 Durak Kodu:</label>
+                            <input type="text" id="stopCode" class="form-input" placeholder="Örn: 10560">
+                        </div>
+                        <div class="form-group">
+                            <label for="lineCode">🛤️ Hat Kodu (Opsiyonel):</label>
+                            <input type="text" id="lineCode" class="form-input" placeholder="Örn: 174">
+                        </div>
+                        <button id="trackBtn" class="btn-primary">🚀 Takibi Başlat</button>
+                    </div>
+                    
+                    <div id="liveResults" class="live-results hidden">
+                        <div class="results-header">
+                            <h3>📍 Canlı Durum</h3>
+                            <button id="refreshLive" class="btn-secondary">🔄 Yenile</button>
+                        </div>
+                        <div id="liveList" class="live-list"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Search Tab -->
+            <section id="search" class="tab-content">
+                <h2 style="margin-bottom: 20px; color: var(--orange);">🌍 Geocoding Arama</h2>
+                <div class="search-section">
+                    <input type="text" id="geoSearch" class="search-input" placeholder="📍 Yer adı veya adres ara...">
+                    <button id="geoSearchBtn" class="search-btn">Ara</button>
+                </div>
+                <div class="results-container">
+                    <div id="geoResults" class="results-grid"></div>
+                    <div id="geoLoading" class="loading hidden">Yükleniyor</div>
+                </div>
+            </section>
+
+            <!-- Announcements Tab -->
+            <section id="announcements" class="tab-content">
+                <h2 style="margin-bottom: 20px; color: var(--orange);">📢 Duyurular</h2>
+                <div class="announcements-list" id="announcementsList">
+                    <div class="loading">Yükleniyor...</div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>EGO API v1.0 | Data from EGO General Directorate</p>
+        </footer>
+    </div>
+
+    <!-- Modal for Stop Details -->
+    <div id="stopModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="modalTitle" class="modal-title">Durak Detayları</h2>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,971 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "EGO CEP'TE API",
+    "description": "Ankara Büyükşehir Belediyesi EGO (Elektrik Gaz Otobüs) Genel Müdürlüğü mobil uygulamasının (`flows_ego_bypass.mitm` kaydından çıkarılan) HTTP API'si.\n\n**Hostlar**\n- `egocptsrvand.ego.gov.tr` — Android uygulaması (ASP tabanlı hibrit servisler).\n- `egocptsrvios.ego.gov.tr` — iOS uygulaması (aynı ASP servisleri, ayrı sunucu).\n- `egocptngapi.ego.gov.tr` — Flutter/Dart tabanlı yeni nesil API (JSON, `Dart/3.11` user-agent).\n\n**Ortak parametreler** (`hibrit/*` uçlarında)\n- `UID` — cihaz/oturum kimliği (ör. `4C19FF69-CF38-4765-A621-63D671359ED3-1019688678`).\n- `LAN` — dil, varsayılan `tr`.\n- `ACSMode` — `0`.\n\n**Yanıt biçimi**\nASP uçları `Content-Type: text/html; Charset=utf-8` döndürse de gövde JSON'dur. `hibrit/srv.asp` çağrıları önce `302` ile `/mblSrv{N}/service.asp?...&secure=ok` adresine yönlendirir; istemci yönlendirmeyi takip etmelidir.\n\n> Bu şema yalnızca dokümante edilmiş gözlemleri yansıtır. Resmî/kamusal bir API sözleşmesi değildir.",
+    "version": "5.1.2",
+    "contact": {
+      "name": "EGO Genel Müdürlüğü",
+      "url": "https://www.ego.gov.tr"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://egocptsrvand.ego.gov.tr",
+      "description": "Android ASP servisleri (hibrit/*)"
+    },
+    {
+      "url": "https://egocptsrvios.ego.gov.tr",
+      "description": "iOS ASP servisleri (hibrit/*)"
+    },
+    {
+      "url": "https://egocptngapi.ego.gov.tr",
+      "description": "Yeni nesil JSON API (api/*, v1/*)"
+    },
+    {
+      "url": "http://localhost:8080",
+      "description": "Yerel CORS proxy (server.js)"
+    }
+  ],
+  "tags": [
+    { "name": "Yapılandırma", "description": "Uygulama yapılandırması ve SSL pinning bilgileri" },
+    { "name": "Duraklar", "description": "Durak arama, yakın duraklar ve duraktan geçen hatlar" },
+    { "name": "Hatlar", "description": "Hat listesi ve hat detayları" },
+    { "name": "Canlı", "description": "Otobüs konumları ve varış süreleri" },
+    { "name": "Sefer", "description": "Duraktan geçiş saatleri" },
+    { "name": "Duyurular", "description": "EGO duyuruları" },
+    { "name": "Coğrafi", "description": "Geocoding ve rota hesaplama" }
+  ],
+  "paths": {
+    "/hibrit/connect/androidConn.asp": {
+      "get": {
+        "tags": ["Yapılandırma"],
+        "summary": "SSL pinning bilgisi (Connect)",
+        "description": "Uygulamanın sertifika pinning konfigürasyonunu döndürür. `Future` ve `ChangeToNew` alanları anahtar rotasyonu için kullanılır.",
+        "operationId": "connect",
+        "x-host": "egocptsrvand.ego.gov.tr",
+        "parameters": [
+          { "$ref": "#/components/parameters/FncConnect" },
+          { "$ref": "#/components/parameters/Device" },
+          { "$ref": "#/components/parameters/Version" },
+          { "$ref": "#/components/parameters/Lang" },
+          { "$ref": "#/components/parameters/Tenant" },
+          { "$ref": "#/components/parameters/Uid" },
+          { "$ref": "#/components/parameters/AcsMode" }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSL pin bilgisi",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SslPinsAndroid" },
+                "example": {
+                  "_id": "ssl_pins",
+                  "IsPinningEnabled": "true",
+                  "Current": {
+                    "SpkiHash": "I11jXOiyn2pSsQgdCzWdUrOPTg9b3SOjgyHA7q0Nlas=",
+                    "ValidFrom": "2026-01-01T00:00:00.000+00:00",
+                    "ValidUntil": "2027-01-01T00:00:00.000+00:00"
+                  },
+                  "Future": null,
+                  "ChangeToNew": "false",
+                  "RotationStartedAt": null
+                }
+              }
+            }
+          },
+          "502": { "$ref": "#/components/responses/ProxyError" }
+        }
+      }
+    },
+    "/hibrit/act.asp": {
+      "get": {
+        "tags": ["Hatlar"],
+        "summary": "Hat listesi / hat detayı (FNC ile ayrışır)",
+        "description": "`FNC=Hatlar` tüm hatları listeler. `FNC=HatBilgileri` tek bir hattın bilgilerini ve durak sırasını döndürür.\n\n**Dikkat:** `HatBilgileri` yanıtı büyüktür (~20-30 KB) ve `table` + `table_durak` olmak üzere iki dizi içerir.",
+        "operationId": "act",
+        "x-host": "egocptsrvand.ego.gov.tr",
+        "parameters": [
+          {
+            "name": "FNC",
+            "in": "query",
+            "required": true,
+            "description": "Çağrılacak fonksiyon.",
+            "schema": { "type": "string", "enum": ["Hatlar", "HatBilgileri"] }
+          },
+          {
+            "name": "QUERY",
+            "in": "query",
+            "required": false,
+            "description": "`Hatlar` için arama metni. Boş bırakılırsa tüm hatlar döner.",
+            "schema": { "type": "string", "default": "" }
+          },
+          {
+            "name": "KOD",
+            "in": "query",
+            "required": false,
+            "description": "`HatBilgileri` için hat kodu (ör. `174`, `101`).",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "YOL",
+            "in": "query",
+            "required": false,
+            "description": "`HatBilgileri` çağrısında `TRUE` verilirse durak listesi (`table_durak`) de döner.",
+            "schema": { "type": "string", "enum": ["TRUE", "FALSE"], "default": "TRUE" }
+          },
+          { "$ref": "#/components/parameters/Uid" },
+          { "$ref": "#/components/parameters/Lang" },
+          { "$ref": "#/components/parameters/AcsMode" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hat listesi veya hat detayı",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/HatlarResponse" },
+                    { "$ref": "#/components/schemas/HatBilgileriResponse" }
+                  ]
+                },
+                "examples": {
+                  "hatlar": {
+                    "summary": "FNC=Hatlar",
+                    "value": {
+                      "table": [
+                        {
+                          "id": "1",
+                          "tur": "EGO, OTOBÜS",
+                          "kod": "101",
+                          "ad": "GÖLBAŞI-HAYMANA YOLU-BAHÇELİEVLER",
+                          "sure": "73",
+                          "mesafe": "43",
+                          "detay": ""
+                        }
+                      ]
+                    }
+                  },
+                  "hatBilgileri": {
+                    "summary": "FNC=HatBilgileri&KOD=174",
+                    "value": {
+                      "table": [
+                        {
+                          "id": "87",
+                          "tur": "EGO, OTOBÜS",
+                          "kod": "174",
+                          "ad": "BEYTEPE METRO-BEYSUKENT ANGORA EVLERİ",
+                          "sure": "60",
+                          "mesafe": "17",
+                          "detay": ""
+                        }
+                      ],
+                      "table_durak": [
+                        {
+                          "id": "5788",
+                          "sira": "1",
+                          "kod": "10486",
+                          "ad": "BEYTEPE METRO İSTASYONU",
+                          "konum": "Mutlukent Mh.1596.Cd.Çankaya",
+                          "lat": "39.904152",
+                          "lng": "32.732622",
+                          "detay": "Mutlukent Mh.1596.Cd.Çankaya"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": { "$ref": "#/components/responses/ProxyError" }
+        }
+      }
+    },
+    "/hibrit/action.asp": {
+      "get": {
+        "tags": ["Duraklar"],
+        "summary": "Durak / duyuru / yakın durak / sefer fonksiyonları (FNC ile ayrışır)",
+        "description": "Tek bir uç nokta üzerinden `FNC` parametresiyle farklı işlemler yapılır:\n\n| FNC | Amaç | Gerekli parametreler |\n|---|---|---|\n| `Duraklar` | Durak arama | `QUERY` |\n| `DuraktanGecenHatlar` | Duraktan geçen hatlar | `KOD` |\n| `DuraktanGecisSaatleri` | Duraktan geçiş saatleri | `HAT`, `TUR`, `DURAK` |\n| `Duyurular` | Duyuru listesi | — |\n| `YakinDuraklar` | Yakın duraklar | `LAT`, `LNG`, `MSF` |",
+        "operationId": "action",
+        "x-host": "egocptsrvand.ego.gov.tr",
+        "parameters": [
+          {
+            "name": "FNC",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["Duraklar", "DuraktanGecenHatlar", "DuraktanGecisSaatleri", "Duyurular", "YakinDuraklar"]
+            }
+          },
+          {
+            "name": "QUERY",
+            "in": "query",
+            "required": false,
+            "description": "`Duraklar` için durak kodu veya adı (ör. `10560`).",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "KOD",
+            "in": "query",
+            "required": false,
+            "description": "`DuraktanGecenHatlar` için durak kodu.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "HAT",
+            "in": "query",
+            "required": false,
+            "description": "`DuraktanGecisSaatleri` için hat kodu.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "TUR",
+            "in": "query",
+            "required": false,
+            "description": "`DuraktanGecisSaatleri` için gün türü.",
+            "schema": { "type": "string", "enum": ["HAFTA İÇİ", "CUMARTESİ", "PAZAR"] }
+          },
+          {
+            "name": "DURAK",
+            "in": "query",
+            "required": false,
+            "description": "`DuraktanGecisSaatleri` için durak kodu.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "LAT",
+            "in": "query",
+            "required": false,
+            "description": "`YakinDuraklar` için enlem.",
+            "schema": { "type": "number", "format": "double" }
+          },
+          {
+            "name": "LNG",
+            "in": "query",
+            "required": false,
+            "description": "`YakinDuraklar` için boylam.",
+            "schema": { "type": "number", "format": "double" }
+          },
+          {
+            "name": "MSF",
+            "in": "query",
+            "required": false,
+            "description": "`YakinDuraklar` için yarıçap (metre). Gözlemlenen değer: `500`.",
+            "schema": { "type": "integer", "default": 500 }
+          },
+          { "$ref": "#/components/parameters/Uid" },
+          { "$ref": "#/components/parameters/Lang" },
+          { "$ref": "#/components/parameters/AcsMode" }
+        ],
+        "responses": {
+          "200": {
+            "description": "FNC'ye göre değişen yanıt gövdesi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/DuraklarResponse" },
+                    { "$ref": "#/components/schemas/DuraktanGecenHatlarResponse" },
+                    { "$ref": "#/components/schemas/DuraktanGecisSaatleriResponse" },
+                    { "$ref": "#/components/schemas/DuyurularResponse" },
+                    { "$ref": "#/components/schemas/YakinDuraklarResponse" }
+                  ]
+                },
+                "examples": {
+                  "duraklar": {
+                    "summary": "FNC=Duraklar&QUERY=10560",
+                    "value": {
+                      "table": [
+                        {
+                          "id": "472",
+                          "kod": "10560",
+                          "ad": "PERİKIZ SK.",
+                          "konum": "Mutlukent Mh.Saltoğlu Angora Cd.Çankaya",
+                          "lat": "39.878134",
+                          "lng": "32.714641",
+                          "detay": "Mutlukent Mh.Saltoğlu Angora Cd.Çankaya"
+                        }
+                      ],
+                      "message": "",
+                      "status": "TRUE"
+                    }
+                  },
+                  "duraktanGecenHatlar": {
+                    "summary": "FNC=DuraktanGecenHatlar&KOD=10560",
+                    "value": {
+                      "table": [
+                        {
+                          "id": "87",
+                          "tur": "EGO, OTOBÜS",
+                          "kod": "174",
+                          "ad": "BEYTEPE METRO-BEYSUKENT ANGORA EVLERİ",
+                          "sure": "60",
+                          "mesafe": "17",
+                          "detay": "Süresi 60 dk, Hat Uzunluğu 17 km"
+                        }
+                      ],
+                      "message": "",
+                      "status": "TRUE"
+                    }
+                  },
+                  "duraktanGecisSaatleri": {
+                    "summary": "FNC=DuraktanGecisSaatleri&HAT=110&TUR=PAZAR&DURAK=10668",
+                    "value": {
+                      "table": [{ "tur": "PAZAR", "saat": "22", "dakika": "46", "detay": "" }],
+                      "message": "8/9/2026 5:20:28 PM",
+                      "status": "TRUE"
+                    }
+                  },
+                  "duyurular": {
+                    "summary": "FNC=Duyurular",
+                    "value": {
+                      "table": [
+                        {
+                          "id": "h6447",
+                          "baslik": "YENİ GİŞELER VE KİŞİSELLEŞTİRME MERKEZLERİ.",
+                          "tarih": "DUYURU 07.08.2026"
+                        },
+                        {
+                          "id": "7769",
+                          "baslik": "224 KUZEY YILDIZI MAHALLESİ-YÜKSELTEPE-ETLİK ŞEHİR HASTANESİ BELİRTİLEN GÜZARGAHTA SAAT 06:30 VE 16:00 HAT TAHSİSİ YAPILMIŞTIR.",
+                          "tarih": "DUYURU 30.07.2026"
+                        }
+                      ]
+                    }
+                  },
+                  "yakinDuraklar": {
+                    "summary": "FNC=YakinDuraklar&MSF=500&LAT=39.8841067&LNG=32.9383026",
+                    "value": {
+                      "table": [
+                        {
+                          "id": "5267",
+                          "kod": "30353",
+                          "ad": "VADİ MANZARA EVLERİ",
+                          "konum": "Akşemsettin Mh.Sultan Fatih Cd.Mamak",
+                          "lat": "39.884156",
+                          "lng": "32.93998",
+                          "detay": "143 m",
+                          "hatlar": "351, 364, 387"
+                        }
+                      ],
+                      "message": "",
+                      "status": "TRUE"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": { "$ref": "#/components/responses/ProxyError" }
+        }
+      }
+    },
+    "/hibrit/srv.asp": {
+      "get": {
+        "tags": ["Canlı"],
+        "summary": "Canlı otobüs konumları (302 yönlendirmeli)",
+        "description": "Çağrı önce `302 Found` ile `/mblSrv{N}/service.asp?...&secure=ok` adresine yönlendirilir (N yük dengeleyici tarafından seçilir). İstemci `Location` başlığını takip etmelidir.\n\n- `FNC=Otobusler`: duraktan geçen **tüm hatların** otobüsleri.\n- `FNC=Otobus`: yalnızca `HAT` parametresindeki hattın otobüsleri.\n\nYanıt `table` dizisinde iki tür satır bulunur:\n1. **Sonraki hareket satırı** — `arac_no: \"-\"`, `sure` içinde serbest metin (ör. `\"Sonraki Hareket Saati İlk Duraktan\\n17:00 / 22 dk Sonra\"`).\n2. **Araç satırı** — `arac_no` gerçek araç numarası, `lat`/`lng`, `sure` (`\"2 dk\"`, `\"Geldi\"`, `\"Geçti\"`), `trafik` bilgisi vb.",
+        "operationId": "srv",
+        "x-host": "egocptsrvand.ego.gov.tr",
+        "parameters": [
+          {
+            "name": "FNC",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["Otobusler", "Otobus"] }
+          },
+          {
+            "name": "DURAK",
+            "in": "query",
+            "required": true,
+            "description": "Durak kodu (ör. `10560`).",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "HAT",
+            "in": "query",
+            "required": false,
+            "description": "`FNC=Otobus` için hat kodu (ör. `174`).",
+            "schema": { "type": "string" }
+          },
+          { "$ref": "#/components/parameters/Uid" },
+          { "$ref": "#/components/parameters/Lang" },
+          { "$ref": "#/components/parameters/AcsMode" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Canlı araç listesi",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OtobusResponse" },
+                "example": {
+                  "table": [
+                    {
+                      "arac_no": "-",
+                      "sure": "Sonraki Hareket Saati İlk Duraktan\n17:00 / 22 dk Sonra",
+                      "detay": "",
+                      "hat_kod": "174",
+                      "hat_no": "174",
+                      "hat_kisa_kod": "174",
+                      "hat_ad": "BEYTEPE METRO-BEYSUKENT ANGORA EVLERİ"
+                    },
+                    {
+                      "arac_no": "11-102",
+                      "plaka_no": "06 DD 9507",
+                      "lat": "39.88089",
+                      "lng": "32.71118833",
+                      "hiz": "0 km",
+                      "durak_no": "10433",
+                      "onceki_durak_no": "10574",
+                      "hat_no": "174",
+                      "konum_tarihi": "09.08.2026 16:38:05",
+                      "durak_sira_no": "14",
+                      "aci": "123",
+                      "doluluk": { "message": "no data" },
+                      "detay": "Solo‚ Engelli",
+                      "trafik": {
+                        "label": "Yoğun",
+                        "trafficLevel": "yogun",
+                        "avgDelayMinutes": 5.0,
+                        "avgDelayText": "5",
+                        "reason": "Trafik: Yoğun",
+                        "lastSeenUtc": "2026-08-09T13:37:50.74Z"
+                      },
+                      "saniye": "123",
+                      "sure": "2 dk",
+                      "secili_durak_no": "10560",
+                      "secili_durak_sira_no": "16",
+                      "yon": "3",
+                      "durum": "",
+                      "konum": "-",
+                      "hat_kod": "174",
+                      "hat_ad": "BEYTEPE METRO-BEYSUKENT ANGORA EVLERİ"
+                    }
+                  ],
+                  "message": "",
+                  "status": "TRUE"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Yönlendirme. `Location` başlığındaki `/mblSrv{N}/service.asp?...&secure=ok` adresine tekrar istek atılmalıdır.",
+            "headers": {
+              "Location": {
+                "description": "Ör. `/mblSrv11/service.asp?&LAN=tr&FNC=Otobusler&DURAK=10560&UID=...&ACSMode=0&secure=ok`",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "text/html": {
+                "example": "<head><title>Object moved</title></head><body><h1>Object Moved</h1>This object may be found <a HREF=\"/mblSrv11/service.asp?...\">here</a>.</body>"
+              }
+            }
+          },
+          "502": { "$ref": "#/components/responses/ProxyError" }
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "tags": ["Yapılandırma"],
+        "summary": "Uygulama yapılandırması",
+        "description": "Minimum uygulama sürümü, zorunlu güncelleme ve özellik anahtarları. `Dart/3.11` user-agent kullanılır.",
+        "operationId": "getConfig",
+        "x-host": "egocptngapi.ego.gov.tr",
+        "responses": {
+          "200": {
+            "description": "Yapılandırma",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AppConfig" },
+                "example": {
+                  "minBuildNumber": 5122,
+                  "minAppVersion": "5.1.2",
+                  "isLoginEnabled": false,
+                  "isCertificatePinningEnabled": false,
+                  "isForceUpdateEnabled": false,
+                  "isSanalKartEnabled": false
+                }
+              }
+            }
+          },
+          "502": { "$ref": "#/components/responses/ProxyError" }
+        }
+      }
+    },
+    "/api/config/ssl-pins": {
+      "get": {
+        "tags": ["Yapılandırma"],
+        "summary": "SSL pin bilgisi (yeni API biçimi)",
+        "description": "`egocptsrvand` üzerindeki `Connect` ucuyla aynı bilgiyi `snake_case` alanlarla döndürür.",
+        "operationId": "getSslPins",
+        "x-host": "egocptngapi.ego.gov.tr",
+        "responses": {
+          "200": {
+            "description": "SSL pin bilgisi",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SslPinsNg" },
+                "example": {
+                  "current": {
+                    "spki_hash": "f7XZum0nsAcNgBBi265+dnUx9iw51q/8/d7jdvOcJS0=",
+                    "valid_from": "2026-01-01T00:00:00Z",
+                    "valid_until": "2027-01-01T00:00:00Z"
+                  },
+                  "future": null,
+                  "change_to_new": false,
+                  "rotation_started_at": null
+                }
+              }
+            }
+          },
+          "502": { "$ref": "#/components/responses/ProxyError" }
+        }
+      }
+    },
+    "/api/geocode": {
+      "get": {
+        "tags": ["Coğrafi"],
+        "summary": "Adres / yer adı arama (geocoding)",
+        "description": "OpenStreetMap tabanlı, GeoJSON `FeatureCollection` döndürür. `EgoCepte/1.0` user-agent kullanılır.",
+        "operationId": "geocode",
+        "x-host": "egocptngapi.ego.gov.tr",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Aranacak metin (ör. `ankara`).",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Döndürülecek maksimum sonuç sayısı.",
+            "schema": { "type": "integer", "default": 1, "minimum": 1, "maximum": 50 }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "description": "Dil. Gözlemlenen değer: `default`.",
+            "schema": { "type": "string", "default": "default" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GeoJSON FeatureCollection",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GeoFeatureCollection" },
+                "example": {
+                  "type": "FeatureCollection",
+                  "features": [
+                    {
+                      "type": "Feature",
+                      "properties": {
+                        "osm_type": "N",
+                        "osm_id": 25869410,
+                        "osm_key": "place",
+                        "osm_value": "city",
+                        "type": "other",
+                        "postcode": "06420",
+                        "countrycode": "TR",
+                        "name": "Ankara",
+                        "city": "Çankaya",
+                        "state": "Ankara",
+                        "country": "Türkiye"
+                      },
+                      "geometry": { "type": "Point", "coordinates": [32.8540497, 39.9207759] }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": { "$ref": "#/components/responses/ProxyError" }
+        }
+      }
+    },
+    "/v1/route/compute": {
+      "get": {
+        "tags": ["Coğrafi"],
+        "summary": "Rota hesaplama ön ısıtma (prewarm)",
+        "description": "Dokümante edilen akışlarda gövdesiz `204 No Content` döner ve `X-Route-Compute-Prewarm: true` başlığı taşır. Rota parametreleri bu kayıtta gözlemlenmemiştir; istemci bu çağrıyı rota hesaplama öncesi ısıtma amacıyla yapar.",
+        "operationId": "routeComputePrewarm",
+        "x-host": "egocptngapi.ego.gov.tr",
+        "responses": {
+          "204": {
+            "description": "İçerik yok (prewarm)",
+            "headers": {
+              "X-Route-Compute-Prewarm": {
+                "description": "Ön ısıtma yanıtı olduğunu belirtir.",
+                "schema": { "type": "string", "example": "true" }
+              },
+              "Cache-Control": {
+                "schema": { "type": "string", "example": "no-store" }
+              }
+            }
+          },
+          "502": { "$ref": "#/components/responses/ProxyError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "FncConnect": {
+        "name": "FNC",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string", "enum": ["Connect"] }
+      },
+      "Device": {
+        "name": "D",
+        "in": "query",
+        "required": false,
+        "description": "Cihaz tanımı.",
+        "schema": { "type": "string", "example": "ANDROID-Xiaomi-M2011K2C-osV:16-apV:5.1.2" }
+      },
+      "Version": {
+        "name": "VER",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "example": "5.1.2" }
+      },
+      "Lang": {
+        "name": "LAN",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "default": "tr" }
+      },
+      "Tenant": {
+        "name": "T",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "default": "default" }
+      },
+      "Uid": {
+        "name": "UID",
+        "in": "query",
+        "required": false,
+        "description": "Cihaz/oturum kimliği.",
+        "schema": {
+          "type": "string",
+          "example": "4C19FF69-CF38-4765-A621-63D671359ED3-1019688678"
+        }
+      },
+      "AcsMode": {
+        "name": "ACSMode",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "enum": ["0", "1"], "default": "0" }
+      }
+    },
+    "responses": {
+      "ProxyError": {
+        "description": "Yerel proxy EGO sunucusuna ulaşamadı veya yanıtı çözemedi.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": { "error": { "type": "string" } }
+            },
+            "example": { "error": "Zaman aşımı" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "SslPinsAndroid": {
+        "type": "object",
+        "description": "Android `Connect` ucu SSL pin yanıtı.",
+        "properties": {
+          "_id": { "type": "string", "example": "ssl_pins" },
+          "IsPinningEnabled": { "type": "string", "enum": ["true", "false"] },
+          "Current": { "$ref": "#/components/schemas/SslPinEntry" },
+          "Future": { "allOf": [{ "$ref": "#/components/schemas/SslPinEntry" }], "nullable": true },
+          "ChangeToNew": { "type": "string", "enum": ["true", "false"] },
+          "RotationStartedAt": { "type": "string", "nullable": true, "format": "date-time" }
+        }
+      },
+      "SslPinEntry": {
+        "type": "object",
+        "properties": {
+          "SpkiHash": { "type": "string", "description": "Base64 SPKI SHA-256 özeti." },
+          "ValidFrom": { "type": "string", "format": "date-time" },
+          "ValidUntil": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SslPinsNg": {
+        "type": "object",
+        "description": "Yeni API (`/api/config/ssl-pins`) SSL pin yanıtı (snake_case).",
+        "properties": {
+          "current": {
+            "type": "object",
+            "properties": {
+              "spki_hash": { "type": "string" },
+              "valid_from": { "type": "string", "format": "date-time" },
+              "valid_until": { "type": "string", "format": "date-time" }
+            }
+          },
+          "future": { "type": "object", "nullable": true },
+          "change_to_new": { "type": "boolean" },
+          "rotation_started_at": { "type": "string", "nullable": true, "format": "date-time" }
+        }
+      },
+      "AppConfig": {
+        "type": "object",
+        "properties": {
+          "minBuildNumber": { "type": "integer", "example": 5122 },
+          "minAppVersion": { "type": "string", "example": "5.1.2" },
+          "isLoginEnabled": { "type": "boolean" },
+          "isCertificatePinningEnabled": { "type": "boolean" },
+          "isForceUpdateEnabled": { "type": "boolean" },
+          "isSanalKartEnabled": { "type": "boolean" }
+        }
+      },
+      "Hat": {
+        "type": "object",
+        "description": "Hat özeti. `table` dizisinde kullanılır.",
+        "properties": {
+          "id": { "type": "string", "description": "Dahili kayıt kimliği." },
+          "tur": { "type": "string", "example": "EGO, OTOBÜS" },
+          "kod": { "type": "string", "example": "174" },
+          "ad": { "type": "string", "example": "BEYTEPE METRO-BEYSUKENT ANGORA EVLERİ" },
+          "sure": { "type": "string", "description": "Sefer süresi (dakika).", "example": "60" },
+          "mesafe": { "type": "string", "description": "Hat uzunluğu (km).", "example": "17" },
+          "detay": { "type": "string" }
+        }
+      },
+      "Durak": {
+        "type": "object",
+        "description": "Durak bilgisi.",
+        "properties": {
+          "id": { "type": "string" },
+          "sira": { "type": "string", "description": "Hattaki sıra numarası (yalnızca `table_durak` içinde)." },
+          "kod": { "type": "string", "example": "10560" },
+          "ad": { "type": "string", "example": "PERİKIZ SK." },
+          "konum": { "type": "string", "example": "Mutlukent Mh.Saltoğlu Angora Cd.Çankaya" },
+          "lat": { "type": "string", "description": "Enlem (ondalık, string).", "example": "39.878134" },
+          "lng": { "type": "string", "description": "Boylam (ondalık, string).", "example": "32.714641" },
+          "detay": { "type": "string" }
+        }
+      },
+      "HatlarResponse": {
+        "type": "object",
+        "properties": {
+          "table": { "type": "array", "items": { "$ref": "#/components/schemas/Hat" } }
+        }
+      },
+      "HatBilgileriResponse": {
+        "type": "object",
+        "properties": {
+          "table": { "type": "array", "items": { "$ref": "#/components/schemas/Hat" } },
+          "table_durak": { "type": "array", "items": { "$ref": "#/components/schemas/Durak" } }
+        }
+      },
+      "DuraklarResponse": {
+        "type": "object",
+        "properties": {
+          "table": { "type": "array", "items": { "$ref": "#/components/schemas/Durak" } },
+          "message": { "type": "string" },
+          "status": { "type": "string", "enum": ["TRUE", "FALSE"] }
+        }
+      },
+      "DuraktanGecenHatlarResponse": {
+        "type": "object",
+        "properties": {
+          "table": { "type": "array", "items": { "$ref": "#/components/schemas/Hat" } },
+          "message": { "type": "string" },
+          "status": { "type": "string", "enum": ["TRUE", "FALSE"] }
+        }
+      },
+      "DuraktanGecisSaatleriResponse": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tur": { "type": "string", "example": "PAZAR" },
+                "saat": { "type": "string", "example": "22" },
+                "dakika": { "type": "string", "example": "46" },
+                "detay": { "type": "string" }
+              }
+            }
+          },
+          "message": { "type": "string", "example": "8/9/2026 5:20:28 PM" },
+          "status": { "type": "string", "enum": ["TRUE", "FALSE"] }
+        }
+      },
+      "DuyurularResponse": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "example": "h6447" },
+                "baslik": { "type": "string" },
+                "tarih": { "type": "string", "example": "DUYURU 07.08.2026" }
+              }
+            }
+          }
+        }
+      },
+      "YakinDuraklarResponse": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                { "$ref": "#/components/schemas/Durak" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "detay": { "type": "string", "description": "Mesafe (ör. `143 m`)." },
+                    "hatlar": { "type": "string", "description": "Virgülle ayrılmış hat kodları.", "example": "351, 364, 387" }
+                  }
+                }
+              ]
+            }
+          },
+          "message": { "type": "string" },
+          "status": { "type": "string", "enum": ["TRUE", "FALSE"] }
+        }
+      },
+      "NextDepartureRow": {
+        "type": "object",
+        "description": "Sonraki hareket satırı (`arac_no: \"-\"`).",
+        "required": ["arac_no"],
+        "properties": {
+          "arac_no": { "type": "string", "enum": ["-"] },
+          "sure": {
+            "type": "string",
+            "description": "Serbest metin; satır sonu içerebilir.",
+            "example": "Sonraki Hareket Saati İlk Duraktan\n17:00 / 22 dk Sonra"
+          },
+          "detay": { "type": "string" },
+          "hat_kod": { "type": "string" },
+          "hat_no": { "type": "string" },
+          "hat_kisa_kod": { "type": "string" },
+          "hat_ad": { "type": "string" }
+        }
+      },
+      "Trafik": {
+        "type": "object",
+        "description": "Araç için trafik/gecikme bilgisi. Bazı yanıtlarda boş nesne (`{}`) olabilir.",
+        "properties": {
+          "label": { "type": "string", "example": "Yoğun" },
+          "trafficLevel": { "type": "string", "example": "yogun" },
+          "avgDelayMinutes": { "type": "number", "example": 5.0 },
+          "avgDelayText": { "type": "string", "example": "5" },
+          "reason": { "type": "string", "nullable": true },
+          "lastSeenUtc": { "type": "string", "format": "date-time" }
+        }
+      },
+      "VehicleRow": {
+        "type": "object",
+        "description": "Canlı araç satırı.",
+        "required": ["arac_no"],
+        "properties": {
+          "arac_no": { "type": "string", "example": "11-102" },
+          "plaka_no": { "type": "string", "example": "06 DD 9507" },
+          "lat": { "type": "string", "example": "39.88089" },
+          "lng": { "type": "string", "example": "32.71118833" },
+          "hiz": { "type": "string", "example": "0 km" },
+          "durak_no": { "type": "string", "description": "Aracın son bildirdiği durak kodu." },
+          "onceki_durak_no": { "type": "string" },
+          "hat_no": { "type": "string" },
+          "hat_kod": { "type": "string" },
+          "hat_ad": { "type": "string" },
+          "hat_kisa_kod": { "type": "string" },
+          "konum_tarihi": { "type": "string", "example": "09.08.2026 16:38:05" },
+          "durak_sira_no": { "type": "string" },
+          "aci": { "type": "string", "description": "Araç yön açısı." },
+          "doluluk": {
+            "type": "object",
+            "properties": { "message": { "type": "string" } }
+          },
+          "detay": { "type": "string", "example": "Solo‚ Engelli" },
+          "trafik": { "$ref": "#/components/schemas/Trafik" },
+          "saniye": { "type": "string", "description": "Varışa kalan saniye. `999999` = geçti." },
+          "sure": { "type": "string", "description": "İnsan okunur varış süresi (`2 dk`, `Geldi`, `Geçti`)." },
+          "secili_durak_no": { "type": "string", "description": "Sorgulanan durak kodu." },
+          "secili_durak_sira_no": { "type": "string" },
+          "yon": { "type": "string" },
+          "durum": { "type": "string", "description": "`geldi`, `gidiyor`, `gecti` veya boş." },
+          "konum": { "type": "string" }
+        }
+      },
+      "OtobusResponse": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "$ref": "#/components/schemas/NextDepartureRow" },
+                { "$ref": "#/components/schemas/VehicleRow" }
+              ]
+            }
+          },
+          "message": { "type": "string" },
+          "status": { "type": "string", "enum": ["TRUE", "FALSE"] }
+        }
+      },
+      "GeoFeatureCollection": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "enum": ["FeatureCollection"] },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "enum": ["Feature"] },
+                "properties": {
+                  "type": "object",
+                  "properties": {
+                    "osm_type": { "type": "string" },
+                    "osm_id": { "type": "integer" },
+                    "osm_key": { "type": "string" },
+                    "osm_value": { "type": "string" },
+                    "type": { "type": "string" },
+                    "postcode": { "type": "string" },
+                    "countrycode": { "type": "string" },
+                    "name": { "type": "string" },
+                    "city": { "type": "string" },
+                    "state": { "type": "string" },
+                    "country": { "type": "string" }
+                  }
+                },
+                "geometry": {
+                  "type": "object",
+                  "properties": {
+                    "type": { "type": "string", "enum": ["Point"] },
+                    "coordinates": {
+                      "type": "array",
+                      "items": { "type": "number" },
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "description": "[boylam, enlem]"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

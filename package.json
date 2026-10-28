@@ -1,0 +1,24 @@
+{
+  "name": "ego-bus-tracker",
+  "version": "1.0.0",
+  "description": "EGO Otobüs Takip - Ankara Büyükşehir Belediyesi EGO Genel Müdürlüğü otobüs takip uygulaması",
+  "main": "server.py",
+  "scripts": {
+    "start": "python server.py",
+    "dev": "python server.py",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "ego",
+    "bus",
+    "transport",
+    "ankara",
+    "tracking"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "flask": "^3.0.0",
+    "requests": "^2.31.0"
+  }
+}

@@ -150,22 +150,12 @@ async function loadLines(query = '') {
         const data = await apiRequest(API_ENDPOINTS.hatlar, { FNC: 'Hatlar', LAN: 'tr' });
 
         allLines = data.table || [];
-        let lines = [...allLines];
         
         if (query && query.trim()) {
-            const q = query.toLowerCase().trim();
-            lines = lines.filter(line => {
-                const ad = (line.ad || '').toLowerCase();
-                const kod = (line.kod || '').toLowerCase();
-                return ad.includes(q) || kod.includes(q);
-            });
-        }
-
-        if (lines.length > 0) {
-            state.lines = lines;
-            renderLines(lines);
+            const filtered = filterLines(query.trim());
+            renderLines(filtered);
         } else {
-            elements.linesResults.innerHTML = '<p class="empty-message">Hatlar yüklenemedi</p>';
+            renderLines(allLines);
         }
     } catch (error) {
         elements.linesResults.innerHTML = `<p class="error-message">Hata: ${error.message}</p>`;
@@ -174,18 +164,36 @@ async function loadLines(query = '') {
     }
 }
 
-async function searchLines(query) {
+// Filter lines from cache
+function filterLines(query) {
+    const q = query.toLowerCase().trim();
+    return allLines.filter(line => {
+        const ad = (line.ad || '').toLowerCase();
+        const kod = (line.kod || '').toLowerCase();
+        return ad.includes(q) || kod.includes(q);
+    });
+}
+
+// Search lines from cache (no API request)
+function searchLines(query) {
     if (!query.trim()) {
-        loadLines();
+        renderLines(allLines);
         return;
     }
-    await loadLines(query);
+    const filtered = filterLines(query);
+    renderLines(filtered);
 }
 
 // Render Lines
 function renderLines(lines) {
     if (lines.length === 0) {
-        elements.linesResults.innerHTML = '<p class="empty-message">Sonuç bulunamadı</p>';
+        // Eğer allLines boşsa, API hatası mesajı göster
+        if (allLines.length === 0) {
+            elements.linesResults.innerHTML = '<p class="empty-message">Hatlar yüklenemedi</p>';
+        } else {
+            // Cache'de veri var ama arama sonucu yok
+            elements.linesResults.innerHTML = '<p class="empty-message">Sonuç bulunamadı</p>';
+        }
         return;
     }
 

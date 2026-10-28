@@ -441,27 +441,27 @@ function renderLiveList(items) {
         const vehiclesAtTime = byTime[time];
         html += `
             <div class="live-item group">
-                <h4 style="margin-bottom:10px; color:var(--primary);">⏱️ ${time} dakika içinde</h4>
+                <h4 style="margin-bottom:12px; color:var(--green); font-weight:700; display:flex; align-items:center; gap:8px;">⏱️ ${time} dakika içinde</h4>
                 ${vehiclesAtTime.map(vehicle => {
                     // Get bus number from multiple possible field names
                     const busNo = vehicle.arac_no || vehicle.arac || '-';
                     const plakaNo = vehicle.plaka_no || vehicle.plaka || '';
-                    const busCode = vehicle.hat_kod || vehicle.kod || vehicle.line || '-';
+                    const busCode = vehicle.hat_kod || vehicle.hat || vehicle.kod || vehicle.line || '-';
                     
                     let badges = '';
                     if (busNo !== '-') badges += `<span class="vehicle-badge">🚌 ${busNo}</span>`;
                     if (plakaNo) badges += `<span class="plaka-badge">🚗 ${plakaNo}</span>`;
                     if (vehicle.trafik?.trafficLevel) {
-                        const trafficColor = vehicle.trafik.trafficLevel === 'yogun' ? 'var(--danger)' : 'var(--text-light)';
-                        badges += `<span class="traffic-badge" style="background:${trafficColor}">🚦 ${vehicle.trafik.label}</span>`;
+                        const trafficClass = vehicle.trafik.trafficLevel === 'yogun' ? 'yogun' : 'normal';
+                        badges += `<span class="traffic-badge ${trafficClass}">🚦 ${vehicle.trafik.label}</span>`;
                     }
 
                     return `
                         <div class="live-item vehicle">
                             <div class="vehicle-info">
                                 ${badges || '<span>🚌 Otobüs</span>'}
-                                ${busCode !== '-' ? `<span style="margin-left:10px; font-weight:bold; color:var(--text-light);">🛤️ ${busCode}</span>` : ''}
-                                ${vehicle.hiz ? `<span style="margin-left:10px;">⚡ ${vehicle.hiz}</span>` : ''}
+                                ${busCode !== '-' ? `<span class="line-badge">🛤️ ${busCode}</span>` : ''}
+                                ${vehicle.hiz ? `<span class="speed-badge">⚡ ${vehicle.hiz}</span>` : ''}
                             </div>
                             ${vehicle.detay ? `<div class="meta">${vehicle.detay}</div>` : ''}
                             ${vehicle.trafik ? `

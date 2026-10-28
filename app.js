@@ -190,7 +190,7 @@ function renderLines(lines) {
     }
 
     elements.linesResults.innerHTML = lines.map(line => `
-        <div class="result-card" onclick="showLineDetails('${line.kod}'); switchToStopsTab();">
+        <div class="result-card" onclick="showLineDetailsInModal('${line.kod}'); switchToStopsTab();">
             <h4>${line.ad}</h4>
             <p><strong>Kod:</strong> ${line.kod}</p>
             <p><strong>Süre:</strong> ${line.sure} dk</p>
@@ -266,12 +266,11 @@ async function showLineDetails(lineCode) {
             LAN: 'tr'
         });
 
-        if (data.table && data.table.length > 0) {
-            const stops = data.table;
+        if (data.table_durak && data.table_durak.length > 0) {
+            const stops = data.table_durak;
             const lineName = allLines.find(l => l.kod === lineCode)?.ad || lineCode;
             
-            // DÜZELTME: İngilizce ifadeler Türkçe'ye çevrildi
-            elements.modalTitle.textContent = `Hat: ${lineCode} - ${lineName}`;
+            elements.modalTitle.textContent = `🛤️ Hat: ${lineCode} - ${lineName}`;
             elements.modalBody.innerHTML = `
                 <div class="modal-header">
                     <h3>🛤️ Hat Bilgileri</h3>
@@ -284,7 +283,7 @@ async function showLineDetails(lineCode) {
                         <div class="stop-card">
                             <div class="stop-info">
                                 <div class="stop-name">${stop.ad}</div>
-                                <div class="stop-code">Durak Kodu: ${stop.kod}</div>
+                                <div class="stop-code">📍 Durak Kodu: ${stop.kod}</div>
                                 ${stop.konum ? `<div class="stop-location">${stop.konum}</div>` : ''}
                             </div>
                             <div class="stop-number">${index + 1}</div>
@@ -294,7 +293,62 @@ async function showLineDetails(lineCode) {
                 
                 <div class="modal-actions">
                     <button class="btn-primary" onclick="openLiveTracking('${lineCode}'); switchToLiveTab('${lineCode}'); closeModal();">
-                        Bus Canlı Takip
+                        🚌 Bus Canlı Takip
+                    </button>
+                </div>
+            `;
+            
+            elements.modal.classList.remove('hidden');
+        } else {
+            elements.modalTitle.textContent = 'Hat Bulunamadı';
+            elements.modalBody.innerHTML = '<p class="empty-message">Bu koda ait hat bulunamadı.</p>';
+            elements.modal.classList.remove('hidden');
+        }
+    } catch (error) {
+        elements.modalTitle.textContent = 'Hata';
+        elements.modalBody.innerHTML = `<p class="error-message">Hata: ${error.message}</p>`;
+        elements.modal.classList.remove('hidden');
+    }
+}
+
+// Show Line Details in Stop Modal
+async function showLineDetailsInModal(lineCode) {
+    try {
+        const data = await apiRequest(API_ENDPOINTS.hatBilgileri, {
+            FNC: 'HatBilgileri',
+            KOD: lineCode,
+            YOL: 'TRUE',
+            LAN: 'tr'
+        });
+
+        if (data.table_durak && data.table_durak.length > 0) {
+            const stops = data.table_durak;
+            const lineName = allLines.find(l => l.kod === lineCode)?.ad || lineCode;
+            
+            elements.modalTitle.textContent = `🛤️ Hat: ${lineCode} - ${lineName}`;
+            elements.modalBody.innerHTML = `
+                <div class="modal-header">
+                    <h3>🛤️ Hat Bilgileri</h3>
+                    <p>Toplam ${stops.length} durak</p>
+                </div>
+                
+                <h3 class="modal-section-title">📍 Bu Hattın Durakları:</h3>
+                <div class="modal-scroll">
+                    ${stops.map((stop, index) => `
+                        <div class="stop-card">
+                            <div class="stop-info">
+                                <div class="stop-name">${stop.ad}</div>
+                                <div class="stop-code">📍 Durak Kodu: ${stop.kod}</div>
+                                ${stop.konum ? `<div class="stop-location">${stop.konum}</div>` : ''}
+                            </div>
+                            <div class="stop-number">${index + 1}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="modal-actions">
+                    <button class="btn-primary" onclick="openLiveTracking('${lineCode}'); switchToLiveTab('${lineCode}'); closeModal();">
+                        🚌 Bus Canlı Takip
                     </button>
                 </div>
             `;

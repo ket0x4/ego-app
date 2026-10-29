@@ -48,10 +48,19 @@ const elements = {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    initTabs();
+    // Olay dinleyicilerini bağla (tuşların çalışması için gerekli)
     initEventListeners();
-    loadLines();
-    loadAnnouncements();
+
+    // Ana sayfayı göster, diğer içerikleri gizle
+    const home = document.getElementById('home');
+    const contents = document.querySelectorAll('.tab-content');
+
+    home.classList.remove('hidden');
+
+    contents.forEach(content => {
+        content.classList.remove('active');
+        content.classList.add('hidden');
+    });
 });
 
 // Tab Navigation
@@ -67,12 +76,69 @@ function initTabs() {
             // Update active content
             elements.tabContents.forEach(content => {
                 content.classList.remove('active');
+                content.classList.add('hidden');
                 if (content.id === target) {
                     content.classList.add('active');
+                    content.classList.remove('hidden');
                 }
             });
         });
     });
+}
+
+// Switch to tab from home menu
+function switchToTab(tabId) {
+    // Ana sayfa menüsünü gizle
+    document.getElementById('home').classList.add('hidden');
+
+    // Set tab button as active
+    const tabBtn = document.querySelector(`[data-tab="${tabId}"]`);
+    if (tabBtn) {
+        elements.tabs.forEach(t => t.classList.remove('active'));
+        tabBtn.classList.add('active');
+    }
+    
+    // Switch to content
+    elements.tabContents.forEach(content => {
+        content.classList.remove('active');
+        content.classList.add('hidden');
+        if (content.id === tabId) {
+            content.classList.add('active');
+            content.classList.remove('hidden');
+        }
+    });
+    
+    // Load data for the tab
+    if (tabId === 'lines') loadLines();
+    if (tabId === 'stops') loadStops();
+    if (tabId === 'announcements') loadAnnouncements();
+}
+
+// Show Home
+function showHome() {
+    // Reset tabs
+    elements.tabs.forEach(t => {
+        t.classList.remove('active');
+        t.style.pointerEvents = 'auto';
+        t.style.opacity = '1';
+    });
+    
+    // Show home, hide all tabs
+    document.getElementById('home').classList.add('active');
+    document.getElementById('home').classList.remove('hidden');
+    
+    elements.tabContents.forEach(content => {
+        content.classList.remove('active');
+        content.classList.add('hidden');
+    });
+    
+    // Clear live tracking
+    if (state.liveInterval) {
+        clearInterval(state.liveInterval);
+        state.liveInterval = null;
+    }
+    elements.liveResults.classList.add('hidden');
+    elements.liveList.innerHTML = '';
 }
 
 // Event Listeners
@@ -198,7 +264,7 @@ function renderLines(lines) {
     }
 
     elements.linesResults.innerHTML = lines.map(line => `
-        <div class="result-card" onclick="showLineDetailsInModal('${line.kod}'); switchToStopsTab();">
+        <div class="result-card" onclick="showLineDetailsInModal('${line.kod}');">
             <h4>${line.ad}</h4>
             <p><strong>Kod:</strong> ${line.kod}</p>
             <p><strong>Süre:</strong> ${line.sure} dk</p>
@@ -303,6 +369,9 @@ async function showLineDetails(lineCode) {
                     <button class="btn-primary" onclick="openLiveTracking('${lineCode}'); switchToLiveTab('${lineCode}'); closeModal();">
                         🚌 Bus Canlı Takip
                     </button>
+                    <button class="btn-secondary" onclick="showHome(); closeModal();">
+                        🏠 Ana Sayfaya Dön
+                    </button>
                 </div>
             `;
             
@@ -358,6 +427,9 @@ async function showLineDetailsInModal(lineCode) {
                     <button class="btn-primary" onclick="openLiveTracking('${lineCode}'); switchToLiveTab('${lineCode}'); closeModal();">
                         🚌 Bus Canlı Takip
                     </button>
+                    <button class="btn-secondary" onclick="showHome(); closeModal();">
+                        🏠 Ana Sayfaya Dön
+                    </button>
                 </div>
             `;
             
@@ -375,17 +447,11 @@ async function showLineDetailsInModal(lineCode) {
 }
 
 function switchToStopsTab() {
-    const stopTab = document.querySelector('[data-tab="stops"]');
-    if (stopTab) {
-        stopTab.click();
-    }
+    switchToTab('stops');
 }
 
 function switchToLiveTab(stopCode) {
-    const liveTab = document.querySelector('[data-tab="live"]');
-    if (liveTab) {
-        liveTab.click();
-    }
+    switchToTab('live');
 }
 
 function openLiveTracking(stopCode) {
@@ -443,6 +509,9 @@ async function loadStopDetails(stopCode) {
                     <div class="action-container">
                         <button class="btn-primary" onclick="openLiveTab('${stopCode}'); closeModal();">
                             Yaklaşan Otobüsleri Görüntüle
+                        </button>
+                        <button class="btn-secondary" onclick="showHome(); closeModal();">
+                            🏠 Ana Sayfaya Dön
                         </button>
                     </div>
                 </div>
@@ -550,6 +619,7 @@ function stopLiveTracking() {
     state.stopCode = '';
     elements.liveResults.classList.add('hidden');
     elements.liveList.innerHTML = '';
+    showHome();
 }
 
 // Render Live List

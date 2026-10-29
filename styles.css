@@ -100,6 +100,132 @@ body {
     }
 }
 
+/* Home Section */
+.home-section {
+    padding: 20px;
+}
+
+.home-content {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.home-content h2 {
+    color: var(--purple);
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.home-content p {
+    color: var(--fg-secondary);
+    font-size: 1.1rem;
+}
+
+/* Menu Grid */
+.menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.menu-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 25px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid var(--border);
+    border-bottom: 4px solid var(--purple);
+}
+
+.menu-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    border-color: var(--purple);
+}
+
+.menu-card:active {
+    transform: translateY(-2px);
+}
+
+.menu-card:nth-child(2) {
+    border-bottom-color: var(--cyan);
+}
+
+.menu-card:nth-child(2):hover,
+.menu-card:nth-child(2):active {
+    border-color: var(--cyan);
+}
+
+.menu-card:nth-child(3) {
+    border-bottom-color: var(--green);
+}
+
+.menu-card:nth-child(3):hover,
+.menu-card:nth-child(3):active {
+    border-color: var(--green);
+}
+
+.menu-card:nth-child(4) {
+    border-bottom-color: var(--orange);
+}
+
+.menu-card:nth-child(4):hover,
+.menu-card:nth-child(4):active {
+    border-color: var(--orange);
+}
+
+.menu-card:nth-child(5) {
+    border-bottom-color: var(--pink);
+}
+
+.menu-card:nth-child(5):hover,
+.menu-card:nth-child(5):active {
+    border-color: var(--pink);
+}
+
+.menu-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+}
+
+.menu-card h3 {
+    color: var(--fg-primary);
+    font-size: 1.3rem;
+    margin-bottom: 10px;
+}
+
+.menu-card p {
+    color: var(--fg-secondary);
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Responsive Menu */
+@media (max-width: 768px) {
+    .menu-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+    }
+    
+    .menu-card {
+        padding: 20px 15px;
+    }
+    
+    .menu-icon {
+        font-size: 2.5rem;
+    }
+    
+    .menu-card h3 {
+        font-size: 1.1rem;
+    }
+    
+    .menu-card p {
+        font-size: 0.8rem;
+    }
+}
+
 /* Tabs */
 .tabs {
     display: flex;
@@ -157,14 +283,32 @@ body {
     }
 }
 
+/* Back Button */
+.back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 15px;
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    color: var(--fg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.back-btn:hover {
+    background: var(--purple);
+    color: var(--bg-primary);
+    border-color: var(--purple);
+}
+
 /* Tab Content */
 .tab-content {
     display: none;
-    background: var(--card-bg);
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    margin-bottom: 10px;
 }
 
 .tab-content.active {
@@ -283,6 +427,33 @@ body {
     display: flex;
     flex-direction: column;
     gap: 15px;
+}
+
+/* Buttons */
+.btn-secondary {
+    width: auto;
+    padding: 12px 20px;
+    background: var(--purple);
+    color: var(--bg-primary);
+    border: none;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    margin-left: 10px;
+}
+
+.btn-secondary:hover {
+    opacity: 0.9;
+}
+
+/* Responsive Buttons */
+@media (max-width: 768px) {
+    .btn-secondary {
+        padding: 10px 16px;
+        font-size: 13px;
+        margin-left: 8px;
+    }
 }
 
 .live-setup {
@@ -595,9 +766,18 @@ body {
 .modal-actions, .action-container {
     margin-top: 20px;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .modal-actions .btn-primary, .action-container .btn-primary {
+    width: auto;
+    padding: 10px 30px;
+    font-size: 0.9rem;
+}
+
+.modal-actions .btn-secondary {
     width: auto;
     padding: 10px 30px;
     font-size: 0.9rem;

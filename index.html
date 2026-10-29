@@ -19,17 +19,44 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Tab Navigation -->
-            <nav class="tabs">
-                <button class="tab-btn active" data-tab="lines">Hatlar</button>
-                <button class="tab-btn" data-tab="stops">Duraklar</button>
-                <button class="tab-btn" data-tab="live">Canlı Takip</button>
-                <button class="tab-btn" data-tab="search">Ara</button>
-                <button class="tab-btn" data-tab="announcements">Duyurular</button>
-            </nav>
+            <!-- Home Section -->
+            <section id="home" class="home-section">
+                <div class="home-content">
+                    <h2>Hoş Geldiniz!</h2>
+                    <p>İstediğiniz özelliğe tıklayın</p>
+                </div>
+                <div class="menu-grid">
+                    <div class="menu-card" onclick="switchToTab('lines')">
+                        <div class="menu-icon">🚌</div>
+                        <h3>Hatlar</h3>
+                        <p>EGO otobüs hatlarını görüntüleyin</p>
+                    </div>
+                    <div class="menu-card" onclick="switchToTab('stops')">
+                        <div class="menu-icon">📍</div>
+                        <h3>Duraklar</h3>
+                        <p>Durak kodu veya adını arayın</p>
+                    </div>
+                    <div class="menu-card" onclick="switchToTab('live')">
+                        <div class="menu-icon">📡</div>
+                        <h3>Canlı Takip</h3>
+                        <p>Otomatik otobüs takibi</p>
+                    </div>
+                    <div class="menu-card" onclick="switchToTab('search')">
+                        <div class="menu-icon">🌍</div>
+                        <h3>Geocoding</h3>
+                        <p>Yer adı veya adres arayın</p>
+                    </div>
+                    <div class="menu-card" onclick="switchToTab('announcements')">
+                        <div class="menu-icon">📢</div>
+                        <h3>Duyurular</h3>
+                        <p>EGO duyurularını görün</p>
+                    </div>
+                </div>
+            </section>
 
             <!-- Lines Tab -->
-            <section id="lines" class="tab-content active">
+            <section id="lines" class="tab-content">
+                <button class="back-btn" onclick="showHome()">← Ana Sayfa</button>
                 <div class="search-section">
                     <input type="text" id="lineSearch" class="search-input" placeholder="🔍 Hat aramaya başla...">
                     <button id="searchLinesBtn" class="search-btn">Ara</button>
@@ -42,6 +69,7 @@
 
             <!-- Stops Tab -->
             <section id="stops" class="tab-content">
+                <button class="back-btn" onclick="showHome()">← Ana Sayfa</button>
                 <div class="search-section">
                     <input type="text" id="stopSearch" class="search-input" placeholder="🔍 Durak kodu veya adını ara...">
                     <button id="searchStopsBtn" class="search-btn">Ara</button>
@@ -54,6 +82,7 @@
 
             <!-- Live Tab -->
             <section id="live" class="tab-content">
+                <button class="back-btn" onclick="showHome()">← Ana Sayfa</button>
                 <div class="live-container">
                     <div class="live-setup">
                         <h2>📡 Canlı Otobüs Takibi</h2>
@@ -80,6 +109,7 @@
 
             <!-- Search Tab -->
             <section id="search" class="tab-content">
+                <button class="back-btn" onclick="showHome()">← Ana Sayfa</button>
                 <h2 style="margin-bottom: 20px; color: var(--orange);">🌍 Geocoding Arama</h2>
                 <div class="search-section">
                     <input type="text" id="geoSearch" class="search-input" placeholder="📍 Yer adı veya adres ara...">
@@ -93,6 +123,7 @@
 
             <!-- Announcements Tab -->
             <section id="announcements" class="tab-content">
+                <button class="back-btn" onclick="showHome()">← Ana Sayfa</button>
                 <h2 style="margin-bottom: 20px; color: var(--orange);">📢 Duyurular</h2>
                 <div class="announcements-list" id="announcementsList">
                     <div class="loading">Yükleniyor...</div>

@@ -160,36 +160,59 @@ function initEventListeners() {
     elements.refreshLive.addEventListener('click', refreshLive); // DÜZELTME: stopLiveTracking yerine refreshLive tetikleniyor
 
     // Geo search
+    elements.geoSearch.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchGeo(elements.geoSearch.value);
+    });
     elements.geoSearchBtn.addEventListener('click', () => searchGeo(elements.geoSearch.value));
+
+    // Live tracking: Enter ile de başlat
+    elements.stopCode.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') startLiveTracking();
+    });
 
     // Modal
     elements.closeModal.addEventListener('click', closeModal);
     elements.modal.addEventListener('click', (e) => {
         if (e.target === elements.modal) closeModal();
     });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !elements.modal.classList.contains('hidden')) closeModal();
+    });
 }
 
 // API Helper
 async function apiRequest(endpoint, params = {}) {
-    console.log('API Request:', { endpoint, params });
-    
-    // URLSearchParams parametreleri otomatik encode eder.
     const queryParams = new URLSearchParams(params).toString();
-    
+    const url = `${API_BASE}/proxy?path=${encodeURIComponent(endpoint)}${queryParams ? '&' + queryParams : ''}`;
+
+    let response;
     try {
-        // DÜZELTME: Çift encode hatası düzeltildi, path doğrudan parametre olarak gönderiliyor
-        const response = await fetch(`${API_BASE}/proxy?path=${endpoint}&${queryParams}`, {
+        response = await fetch(url, {
             method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            }
+            headers: { 'Accept': 'application/json' }
         });
-        const text = await response.text();
-        return JSON.parse(text);
     } catch (error) {
         console.error('API Error:', error);
-        throw error;
+        throw new Error('Sunucuya ulaşılamadı. Bağlantınızı kontrol edin.');
     }
+
+    const text = await response.text();
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch (error) {
+        console.error('API Parse Error:', text.slice(0, 200));
+        throw new Error(`Sunucudan geçersiz yanıt alındı (HTTP ${response.status}).`);
+    }
+
+    if (data && data.error) {
+        throw new Error(data.error);
+    }
+    if (!response.ok) {
+        throw new Error(`İstek başarısız oldu (HTTP ${response.status}).`);
+    }
+
+    return data;
 }
 
 // API Endpoints
@@ -276,6 +299,11 @@ function renderLines(lines) {
 
 // Load Stops
 async function loadStops(query = '') {
+    if (!query.trim()) {
+        elements.stopsResults.innerHTML = '<p class="empty-message">Durak adı veya kodu yazarak arama yapın</p>';
+        return;
+    }
+
     try {
         showLoading(elements.stopsLoading);
         elements.stopsResults.innerHTML = '';
@@ -316,7 +344,7 @@ function renderStops(stops) {
     }
 
     elements.stopsResults.innerHTML = stops.map(stop => `
-        <div class="result-card" onclick="openLiveTracking('${stop.kod}'); switchToLiveTab('${stop.kod}');">
+        <div class="result-card" onclick="loadStopDetails('${stop.kod}')">
             <h4>${stop.ad}</h4>
             <p><strong>Kod:</strong> ${stop.kod}</p>
             <p><strong>Konum:</strong> ${stop.konum}</p>
@@ -366,8 +394,8 @@ async function showLineDetails(lineCode) {
                 </div>
                 
                 <div class="modal-actions">
-                    <button class="btn-primary" onclick="openLiveTracking('${lineCode}'); switchToLiveTab('${lineCode}'); closeModal();">
-                        🚌 Bus Canlı Takip
+                    <button class="btn-primary" onclick="openLineTracking('${lineCode}'); closeModal();">
+                        🚌 Bu Hattı Canlı Takip Et
                     </button>
                     <button class="btn-secondary" onclick="showHome(); closeModal();">
                         🏠 Ana Sayfaya Dön
@@ -424,8 +452,8 @@ async function showLineDetailsInModal(lineCode) {
                 </div>
                 
                 <div class="modal-actions">
-                    <button class="btn-primary" onclick="openLiveTracking('${lineCode}'); switchToLiveTab('${lineCode}'); closeModal();">
-                        🚌 Bus Canlı Takip
+                    <button class="btn-primary" onclick="openLineTracking('${lineCode}'); closeModal();">
+                        🚌 Bu Hattı Canlı Takip Et
                     </button>
                     <button class="btn-secondary" onclick="showHome(); closeModal();">
                         🏠 Ana Sayfaya Dön
@@ -462,7 +490,19 @@ function openLiveTracking(stopCode) {
 }
 
 function openLiveTab(stopCode) {
+    switchToTab('live');
     openLiveTracking(stopCode);
+}
+
+// Hat modalından canlı takibe geç: hat kodunu doldur, durak kodunu kullanıcıya bırak.
+function openLineTracking(lineCode) {
+    switchToTab('live');
+    elements.stopCode.value = '';
+    elements.lineCode.value = lineCode;
+    state.stopCode = '';
+    elements.liveResults.classList.add('hidden');
+    elements.liveList.innerHTML = '';
+    elements.stopCode.focus();
 }
 
 async function loadStopDetails(stopCode) {
@@ -536,7 +576,7 @@ function closeModal() {
 
 // Live Tracking
 async function startLiveTracking() {
-    const stopCode = state.stopCode || elements.stopCode.value.trim();
+    const stopCode = elements.stopCode.value.trim() || state.stopCode;
     const lineCode = elements.lineCode.value.trim();
 
     if (!stopCode) {
@@ -544,9 +584,13 @@ async function startLiveTracking() {
         return;
     }
 
+    state.stopCode = stopCode;
+
+    // Kullanıcıya yükleme geri bildirimi ver.
+    elements.liveResults.classList.remove('hidden');
+    elements.liveList.innerHTML = '<div class="loading">Otobüsler aranıyor...</div>';
+
     try {
-        showLoading(null);
-        
         const params = {
             FNC: lineCode ? 'Otobus' : 'Otobusler',
             DURAK: stopCode,
@@ -574,15 +618,15 @@ async function startLiveTracking() {
             `;
         }
     } catch (error) {
-        alert(`Hata: ${error.message}`);
-    } finally {
-        hideLoading(null);
+        elements.liveList.innerHTML = `<p class="error-message">Hata: ${error.message}</p>`;
     }
 }
 
 async function refreshLive() {
-    const stopCode = state.stopCode || elements.stopCode.value.trim();
+    const stopCode = elements.stopCode.value.trim() || state.stopCode;
     const lineCode = elements.lineCode.value.trim();
+
+    if (!stopCode) return;
 
     try {
         const params = {
@@ -639,6 +683,8 @@ function renderLiveList(items) {
         if (!item.arac_no || item.arac_no === '-') return false;
         if (item.availabilite === 0 || item.availabilite === '0' || item.availabilite === false || item.availabilite === 'false') return false;
         if (item.status === 'durduruldu' || item.status === 'duraklatildi') return false;
+        const durum = String(item.durum || '').toLowerCase();
+        if (durum.includes('durdur') || durum.includes('pasif')) return false;
         return true;
     });
 
@@ -711,8 +757,10 @@ function renderLiveList(items) {
                             badges += `<span class="badge badge-plate">🚗 ${plakaNo}</span>`;
                         }
                         if (vehicle.trafik?.trafficLevel) {
-                            const trafficClass = vehicle.trafik.trafficLevel === 'yogun' ? 'traffic-heavy' : 'traffic-normal';
-                            badges += `<span class="badge ${trafficClass}">🚦 ${vehicle.trafik.label}</span>`;
+                            const level = vehicle.trafik.trafficLevel;
+                            const heavy = ['yogun', 'az_yogun', 'cok_yogun', 'çok_yoğun'].includes(level);
+                            const trafficClass = heavy ? 'traffic-heavy' : 'traffic-normal';
+                            badges += `<span class="badge ${trafficClass}">🚦 ${vehicle.trafik.label || level}</span>`;
                         }
 
                         return `
@@ -748,8 +796,21 @@ async function searchGeo(query) {
         showLoading(elements.geoLoading);
         elements.geoResults.innerHTML = '';
 
-        const params = { q: query, limit: 10 };
-        const data = await apiRequest('/api/geocode', params);
+        const params = new URLSearchParams({ q: query, limit: 10 });
+        const response = await fetch(`${API_BASE}/api/geocode?${params.toString()}`, {
+            headers: { 'Accept': 'application/json' }
+        });
+
+        let data;
+        try {
+            data = await response.json();
+        } catch (error) {
+            throw new Error(`Geçersiz yanıt alındı (HTTP ${response.status}).`);
+        }
+
+        if (!response.ok) {
+            throw new Error(data.error || `İstek başarısız oldu (HTTP ${response.status}).`);
+        }
 
         if (data.type === 'FeatureCollection' && data.features && data.features.length > 0) {
             renderGeoResults(data.features);
@@ -765,21 +826,72 @@ async function searchGeo(query) {
 
 function renderGeoResults(features) {
     elements.geoResults.innerHTML = features.map(feature => {
-        const props = feature.properties;
-        const coords = feature.geometry.coordinates;
-        
+        const props = feature.properties || {};
+        const coords = (feature.geometry && feature.geometry.coordinates) || [];
+        if (coords.length < 2) return '';
+
+        const name = props.name || 'Bilinmeyen Yer';
         return `
-            <div class="result-card" onclick="alert('Koordinatlar: ${coords[0]}, ${coords[1]}')">
-                <h4>${props.name || 'Bilinmeyen Yer'}</h4>
-                <p><strong>Tür:</strong> ${props.osm_value || 'Diğer'}</p>
-                ${props.city ? `<p><strong>Şehir:</strong> ${props.city}</p>` : ''}
-                ${props.state ? `<p><strong>İl:</strong> ${props.state}</p>` : ''}
+            <div class="result-card"
+                 data-lat="${coords[1]}" data-lng="${coords[0]}" data-name="${escapeHtml(name)}"
+                 onclick="showNearbyStops(this.dataset.lat, this.dataset.lng, this.dataset.name)">
+                <h4>${escapeHtml(name)}</h4>
+                <p><strong>Tür:</strong> ${escapeHtml(props.osm_value || 'Diğer')}</p>
+                ${props.city ? `<p><strong>Şehir:</strong> ${escapeHtml(props.city)}</p>` : ''}
+                ${props.state ? `<p><strong>İl:</strong> ${escapeHtml(props.state)}</p>` : ''}
                 <div class="meta">
                     📍 ${coords[0]}, ${coords[1]}
                 </div>
             </div>
         `;
     }).join('');
+}
+
+// Bir konumun yakınındaki durakları göster
+async function showNearbyStops(lat, lng, name = '') {
+    elements.modalTitle.textContent = `📍 ${name || 'Konum'} yakınındaki duraklar`;
+    elements.modalBody.innerHTML = '<div class="loading">Yakın duraklar aranıyor...</div>';
+    elements.modal.classList.remove('hidden');
+
+    try {
+        const data = await apiRequest(API_ENDPOINTS.yakinDuraklar, {
+            FNC: 'YakinDuraklar',
+            LAT: lat,
+            LNG: lng,
+            MSF: 500,
+            LAN: 'tr'
+        });
+
+        const stops = data.table || [];
+        if (stops.length === 0) {
+            elements.modalBody.innerHTML = '<p class="empty-message">Yakında durak bulunamadı.</p>';
+            return;
+        }
+
+        elements.modalBody.innerHTML = `
+            <div class="modal-header">
+                <h3>📍 Yakın Duraklar</h3>
+                <p>${stops.length} durak bulundu</p>
+            </div>
+            <div class="modal-scroll">
+                ${stops.map(stop => `
+                    <div class="stop-card clickable" onclick="loadStopDetails('${escapeHtml(stop.kod)}')">
+                        <div class="stop-info">
+                            <div class="stop-name">${escapeHtml(stop.ad)}</div>
+                            <div class="stop-code">📍 ${escapeHtml(stop.kod)}${stop.detay ? ' • ' + escapeHtml(stop.detay) : ''}</div>
+                            ${stop.hatlar ? `<div class="stop-location">🚌 ${escapeHtml(stop.hatlar)}</div>` : ''}
+                        </div>
+                        <div class="stop-number">›</div>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="showHome(); closeModal();">🏠 Ana Sayfaya Dön</button>
+            </div>
+        `;
+    } catch (error) {
+        elements.modalBody.innerHTML = `<p class="error-message">Hata: ${error.message}</p>`;
+    }
 }
 
 // Load Announcements
@@ -808,14 +920,23 @@ function renderAnnouncements(announcements) {
 
     elements.announcementsList.innerHTML = announcements.map(ann => `
         <div class="announcement-item">
-            <h4>${ann.baslik || 'Duyuru'}</h4>
-            <div class="date">${ann.tarih || ''}</div>
-            <p>${ann.baslik}</p>
+            <h4>${escapeHtml(ann.baslik || 'Duyuru')}</h4>
+            <div class="date">${escapeHtml(ann.tarih || '')}</div>
         </div>
     `).join('');
 }
 
 // Utility Functions
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[ch]));
+}
+
 function showLoading(element) {
     if (element) {
         element.classList.remove('hidden');

@@ -147,6 +147,11 @@ Geographic konum bazlı durak arama:
 
 Uygulama, EGO API'sine proxy olarak çalışır.
 
+### Proxy Güvenliği ve Cache
+- `/proxy` yalnızca `act.asp`, `action.asp` ve `srv.asp` uçlarındaki belgelenmiş `FNC` değerlerine izin verir.
+- Hat, durak, duyuru ve sefer gibi sabit veriler sunucuda 5 dakika cache'lenir; canlı otobüs verisi cache'lenmez.
+- `/api/geocode` sonuçları Ankara sınırlarına (bbox) göre filtrelenir.
+
 ### EGO API Bilgisi
 - **Host**: `https://egocptsrvand.ego.gov.tr`
 - **Proxy Endpoint**: `/proxy?path=API_PATH`

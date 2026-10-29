@@ -1,7 +1,7 @@
-// EGO Otobüs Takip - basit proxy ve statik dosya sunucusu.
+// EGO Bus Tracker - simple proxy and static file server.
 //
-// Python sürümünün (server.py) birebir Go karşılığıdır; harici bağımlılık
-// gerektirmez.
+// This is a drop-in Go replacement for the previous Python server (server.py);
+// it has no external dependencies.
 package main
 
 import (
@@ -43,17 +43,17 @@ type server struct {
 }
 
 func main() {
-	addr := flag.String("addr", defaultAddr, "dinlenecek adres (örn. :5000)")
-	root := flag.String("dir", ".", "statik dosyaların bulunduğu dizin")
+	addr := flag.String("addr", defaultAddr, "address to listen on (e.g. :5000)")
+	root := flag.String("dir", ".", "directory containing static files")
 	flag.Parse()
 
 	rootAbs, err := filepath.Abs(*root)
 	if err != nil {
-		log.Fatalf("statik dizin çözümlenemedi: %v", err)
+		log.Fatalf("failed to resolve static directory: %v", err)
 	}
 
-	// EGO API SSL sertifikası doğrulanamadığı için doğrulama kapatılır.
-	// #nosec G402 -- bilinçli olarak devre dışı bırakılmıştır.
+	// TLS verification is disabled because the EGO API certificate cannot be verified.
+	// #nosec G402 -- intentionally disabled.
 	transport := &http.Transport{
 		Proxy:              http.ProxyFromEnvironment,
 		ForceAttemptHTTP2:  true,
@@ -80,7 +80,7 @@ func main() {
 
 	go func() {
 		<-ctx.Done()
-		log.Println("Sunucu kapatılıyor...")
+		log.Println("Shutting down server...")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = httpServer.Shutdown(shutdownCtx)
@@ -88,7 +88,7 @@ func main() {
 
 	log.Printf("Server running on http://localhost%s", *addr)
 	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("sunucu hatası: %v", err)
+		log.Fatalf("server error: %v", err)
 	}
 }
 
@@ -116,7 +116,7 @@ func (s *server) route(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ---------- Yardımcılar ----------
+// ---------- Helpers ----------
 
 func writeBytes(w http.ResponseWriter, status int, body []byte, contentType string) {
 	w.Header().Set("Content-Type", contentType)
@@ -138,7 +138,7 @@ func notFound(w http.ResponseWriter) {
 	writeBytes(w, http.StatusNotFound, []byte("<h1>404 Not Found</h1>"), "text/html; charset=utf-8")
 }
 
-// ---------- Statik dosyalar ----------
+// ---------- Static files ----------
 
 func (s *server) handleStatic(w http.ResponseWriter, r *http.Request) {
 	relPath := r.URL.Path
@@ -148,7 +148,7 @@ func (s *server) handleStatic(w http.ResponseWriter, r *http.Request) {
 		relPath = strings.TrimLeft(relPath, "/")
 	}
 
-	// Yalnızca güvenli statik dosya uzantılarına izin ver.
+	// Only allow safe static file extensions.
 	if !allowedExtensions[strings.ToLower(filepath.Ext(relPath))] {
 		notFound(w)
 		return
@@ -167,7 +167,7 @@ func (s *server) handleStatic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Dizin dışına çıkmayı engelle (path traversal koruması).
+	// Prevent escaping the directory (path traversal protection).
 	if resolved != s.root && !strings.HasPrefix(resolved, s.root+string(filepath.Separator)) {
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
 		return
@@ -181,7 +181,7 @@ func (s *server) handleStatic(w http.ResponseWriter, r *http.Request) {
 
 	body, err := os.ReadFile(resolved)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "dosya okunamadı"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to read file"})
 		return
 	}
 
@@ -216,7 +216,7 @@ func (s *server) handleProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// path parametresi parse edilirken zaten çözüldü; tekrar unquote etmiyoruz.
+	// The path parameter was already decoded during query parsing; do not unquote it again.
 	apiPath := pathParam
 	params := url.Values{}
 	if strings.Contains(pathParam, "?") {
@@ -231,7 +231,7 @@ func (s *server) handleProxy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// "path" parametresini EGO'ya göndermiyoruz, sadece gerçek API parametreleri gider.
+	// Do not forward the "path" parameter to EGO; only real API parameters are sent.
 	for key, values := range query {
 		if key == "path" {
 			continue
@@ -262,8 +262,7 @@ func (s *server) handleProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	// Python urllib 4xx/5xx yanıtlarını hata olarak değerlendirdiği için
-	// burada da 502 dönüyoruz.
+	// Python urllib treated 4xx/5xx responses as errors, so return 502 here too.
 	if resp.StatusCode >= http.StatusBadRequest {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": resp.Status})
 		return
